@@ -1,0 +1,14 @@
+/home/luftmyszor/studies/chronotape/tape-gen/bin/Debug/net10.0/tape-gen
+/home/luftmyszor/studies/chronotape/tape-gen/bin/Debug/net10.0/tape-gen.deps.json
+/home/luftmyszor/studies/chronotape/tape-gen/bin/Debug/net10.0/tape-gen.runtimeconfig.json
+/home/luftmyszor/studies/chronotape/tape-gen/bin/Debug/net10.0/tape-gen.dll
+/home/luftmyszor/studies/chronotape/tape-gen/bin/Debug/net10.0/tape-gen.pdb
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.GeneratedMSBuildEditorConfig.editorconfig
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.AssemblyInfoInputs.cache
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.AssemblyInfo.cs
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.csproj.CoreCompileInputs.cache
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.dll
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/refint/tape-gen.dll
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.pdb
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/tape-gen.genruntimeconfig.cache
+/home/luftmyszor/studies/chronotape/tape-gen/obj/Debug/net10.0/ref/tape-gen.dll
