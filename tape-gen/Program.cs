@@ -82,7 +82,8 @@ foreach (var slit in slits)
 var displayedSegments = new List<Frame>();
 
 // Calculate the "Up" direction so each frame lies flat on the display surface,
-// aligned with the tape's direction.
+// aligned with the tape's direction. This is constant for all frames because
+// the display surface normal and tape direction are the same for every frame.
 Vector3D surfaceUp = Vector3D.Cross(displaySurface.Normal, slitFramesDirection);
 
 for (int i = 0; i < SLIT_AMOUNT; i++)
@@ -135,7 +136,8 @@ for (int i = 0; i < SLIT_AMOUNT; i++)
     }
 
     // Average the 4 intersection points. For a perfect point-source projection the
-    // four rays converge at the same spot; averaging handles any floating-point drift.
+    // four rays converge at the same spot; averaging handles any floating-point drift
+    // and keeps the code correct for non-axis-aligned source planes.
     Point3D lightSource = new Point3D(
         (tlSource.X + trSource.X + blSource.X + brSource.X) / 4,
         (tlSource.Y + trSource.Y + blSource.Y + brSource.Y) / 4,
