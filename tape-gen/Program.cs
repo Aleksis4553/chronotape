@@ -1,5 +1,5 @@
 using System;
-using System.ComponentModel.Design;
+using System.Collections.Generic;
 using Phys;
 
 const double DISPLAYED_WIDTH = 70;
@@ -77,41 +77,28 @@ foreach (var slit in slits)
 
 // --- Ceiling Displayed Segments Setup ---
 
+// Calculate the "Up" direction for frames lying flat on the display surface,
+// aligned with the tape track direction.
+Vector3D surfaceUp = Vector3D.Cross(displaySurface.Normal, slitFramesDirection);
+
 var displayedSegments = new List<Frame>();
 
 for (int i = 0; i < SLIT_AMOUNT; i++)
 {
     double currentOffset = (i - middleIndex) * DISPLAYED_SEGMENT_CENTER_DISTANCE;
 
-    // 2. Find the "shadow" of this segment on the flat floor
-    Point3D groundPoint = new Point3D(
-        chronotapeFrameOrigin.X + (slitFramesDirection.X * currentOffset),
-        chronotapeFrameOrigin.Y,
-        chronotapeFrameOrigin.Z + (slitFramesDirection.Z * currentOffset)
+    // Place each display frame center directly on the display surface at the appropriate offset
+    // along the track direction. No light-source assumption is needed here.
+    Point3D segmentCenter = new Point3D(
+        displaySurface.Point.X + (slitFramesDirection.X * currentOffset),
+        displaySurface.Point.Y + (slitFramesDirection.Y * currentOffset),
+        displaySurface.Point.Z + (slitFramesDirection.Z * currentOffset)
     );
 
-    // 3. Project a ray from the ground point, through the corresponding slit center,
-    //    onto the display surface. This works for any surface orientation because
-    //    the ray travels along the tape's normal (Z) axis toward the display.
-    if (!GeometryMath.GetProjectionPoint(groundPoint, slits[i].Center, displaySurface, out Point3D segmentCenter))
-    {
-        Console.WriteLine($"Warning: Slit {i} cannot be projected - the ray from ground point through slit center is parallel to the display surface.");
-        continue;
-    }
-
-    // 4. Calculate the perfect "Up" direction for the frame so it lies flat on the surface.
-    // By crossing the Plane's Normal with the Track's Direction, it aligns perfectly to the track.
-    Vector3D surfaceUp = new Vector3D(
-        (displaySurface.Normal.Y * slitFramesDirection.Z) - (displaySurface.Normal.Z * slitFramesDirection.Y),
-        (displaySurface.Normal.Z * slitFramesDirection.X) - (displaySurface.Normal.X * slitFramesDirection.Z),
-        (displaySurface.Normal.X * slitFramesDirection.Y) - (displaySurface.Normal.Y * slitFramesDirection.X)
-    );
-
-    // 5. Create and add the frame
     Frame newSegment = new Frame(
         segmentCenter,
-        displaySurface.Normal, // Faces the exact direction of the arbitrary plane
-        surfaceUp,             // Lies flat on the plane, following the track
+        displaySurface.Normal,
+        surfaceUp,
         DISPLAYED_WIDTH,
         DISPLAYED_HEIGHT
     );
@@ -120,8 +107,36 @@ for (int i = 0; i < SLIT_AMOUNT; i++)
 }
 
 // --- Quick test for Ceiling Segments ---
-Console.WriteLine("\n--- Displayed Segments (Any Surface) ---");
+Console.WriteLine("\n--- Displayed Segments ---");
 foreach (var segment in displayedSegments)
 {
     Console.WriteLine($"X: {segment.Center.X}  Y: {segment.Center.Y}  Z: {segment.Center.Z}");
+}
+
+// --- Light Source Position Detection ---
+// For each (display frame, tape slit) pair, cast rays from each display frame corner
+// through the corresponding tape frame corner. Where these rays converge is the
+// light source position — no predefined light surface plane needed.
+
+Console.WriteLine("\n--- Light Source Positions ---");
+for (int i = 0; i < SLIT_AMOUNT; i++)
+{
+    Frame display = displayedSegments[i];
+    Frame slit = slits[i];
+
+    var rays = new List<Ray>
+    {
+        new Ray(display.TopRight,    new Vector3D(display.TopRight,    slit.TopRight)),
+        new Ray(display.TopLeft,     new Vector3D(display.TopLeft,     slit.TopLeft)),
+        new Ray(display.BottomRight, new Vector3D(display.BottomRight, slit.BottomRight)),
+        new Ray(display.BottomLeft,  new Vector3D(display.BottomLeft,  slit.BottomLeft)),
+    };
+
+    if (!GeometryMath.GetClosestPointToRays(rays, out Point3D lightSource))
+    {
+        Console.WriteLine($"Warning: Could not determine light source for slit {i} — rays may be parallel.");
+        continue;
+    }
+
+    Console.WriteLine($"Slit {i}: X: {lightSource.X:F2}  Y: {lightSource.Y:F2}  Z: {lightSource.Z:F2}");
 }
