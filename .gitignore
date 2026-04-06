@@ -1,0 +1,82 @@
+# =========================
+# .NET / C# build outputs
+# =========================
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+
+# Build results
+[Dd]ebug*/
+[Rr]elease*/
+x64/
+x86/
+[Aa]ny[Cc][Pp][Uu]/
+[Aa]rm*/
+msbuild.binlog
+
+# =========================
+# Visual Studio / Rider / VS Code
+# =========================
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.csproj.user
+
+# Rider / ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# =========================
+# NuGet / packages
+# =========================
+# Typically DO NOT ignore packages.lock.json if you use it (commit it)
+# packages folder is used by legacy projects (packages.config)
+packages/
+
+# =========================
+# Test / coverage artifacts
+# =========================
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage.xml
+*.opencover.xml
+
+# =========================
+# Publish / packaging
+# =========================
+publish/
+artifacts/
+*.nupkg
+*.snupkg
+
+# =========================
+# ASP.NET / local secrets
+# =========================
+appsettings.Development.json
+secrets.json
+
+# Dotnet user secrets are stored outside the repo, but keep common secret files ignored
+*.pfx
+*.p12
+*.key
+
+# =========================
+# Misc
+# =========================
+*.log
+*.tmp
+*.bak
+*.cache
+.DS_Store
+Thumbs.db

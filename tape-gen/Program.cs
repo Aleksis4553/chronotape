@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Phys;
 
@@ -6,9 +6,9 @@ const double DISPLAYED_WIDTH = 70;
 const double DISPLAYED_HEIGHT = 70;
 const double DISPLAYED_SEGMENT_CENTER_DISTANCE = 90;
 
-const double SLIT_WIDTH = 20;
-const double SLIT_HEIGHT = 20;
-const double SLIT_SEGMENT_CENTER_DISTANCE = 50;
+const double SLIT_WIDTH = 15;
+const double SLIT_HEIGHT = 15;
+const double SLIT_SEGMENT_CENTER_DISTANCE = 40;
 
 const int SLIT_AMOUNT = 4;
 
