@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("tape-gen")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5a08284ffae83d00d76345fad3a5b2c29617508c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c20e68e5b774497e4fd61446523e75d2cd176d34")]
 [assembly: System.Reflection.AssemblyProductAttribute("tape-gen")]
 [assembly: System.Reflection.AssemblyTitleAttribute("tape-gen")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using Phys;
 
-const double DISPLAYED_WIDTH = 70;
-const double DISPLAYED_HEIGHT = 70;
-const double DISPLAYED_SEGMENT_CENTER_DISTANCE = 90;
+const double DISPLAYED_WIDTH = 200;
+const double DISPLAYED_HEIGHT = 200;
+const double DISPLAYED_SEGMENT_CENTER_DISTANCE = 220;
 
-const double SLIT_WIDTH = 15;
-const double SLIT_HEIGHT = 15;
-const double SLIT_SEGMENT_CENTER_DISTANCE = 40;
+const double SLIT_WIDTH = 10;
+const double SLIT_HEIGHT = 10;
+const double SLIT_SEGMENT_CENTER_DISTANCE = 15;
 
 const int SLIT_AMOUNT = 4;
 
@@ -34,7 +34,7 @@ Vector3D slitFramesUp = new Vector3D(0, 1, 0);
 Vector3D slitFrameNormal = new Vector3D(0, 0, 1);
 
 Vector3D surfaceNormal = new Vector3D(0, 0, 1);
-Point3D surfacePoint = new Point3D(0, 0, 3000);
+Point3D surfacePoint = new Point3D(0, 0, 2000);
 Plane displaySurface = new Plane(surfaceNormal, surfacePoint);
 
 var slits = new List<Frame>();
