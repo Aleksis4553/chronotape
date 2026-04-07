@@ -2,17 +2,17 @@
 using System.Collections.Generic;
 using Phys;
 
-const double DISPLAYED_WIDTH = 200;
-const double DISPLAYED_HEIGHT = 200;
-const double DISPLAYED_SEGMENT_CENTER_DISTANCE = 220;
+const double DISPLAYED_WIDTH = 150;
+const double DISPLAYED_HEIGHT = 300;
+const double DISPLAYED_SEGMENT_CENTER_DISTANCE = 160;
 
-const double SLIT_WIDTH = 10;
+const double SLIT_WIDTH = 5;
 const double SLIT_HEIGHT = 10;
-const double SLIT_SEGMENT_CENTER_DISTANCE = 15;
+const double SLIT_SEGMENT_CENTER_DISTANCE = 50;
 
 const int SLIT_AMOUNT = 4;
 
-const double TAPE_TOP_HEIGHT_FROM_GROUND = 100;
+const double TAPE_TOP_HEIGHT_FROM_GROUND = 0;
 /*
  *          +Y (Up)
  *             ^
