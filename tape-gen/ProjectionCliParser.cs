@@ -50,7 +50,7 @@ internal static class ProjectionCliParser
             Environment.Exit(1);
         }
 
-        if (!text.All(static char.IsDigit))
+        if (!text.All(char.IsDigit))
         {
             Console.WriteLine("--text must contain only digits 0-9.");
             Environment.Exit(1);
