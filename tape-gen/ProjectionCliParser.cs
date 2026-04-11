@@ -10,11 +10,14 @@ internal static class ProjectionCliParser
         "--out",
         "--text",
         "--text-size",
-        "--sample-step"
+        "--sample-step",
+        "--world-geometry"
     ];
 
-    public static ProjectionParseResult Parse(string[] cliArgs)
+    public static ProjectionParseResult Parse(string[] cliArgs, Func<string, string?>? environmentReader = null)
     {
+        environmentReader ??= Environment.GetEnvironmentVariable;
+
         bool hasProjectionDebug = cliArgs.Contains(ProjectionDebugFlag, StringComparer.OrdinalIgnoreCase);
         if (!hasProjectionDebug)
         {
@@ -74,13 +77,22 @@ internal static class ProjectionCliParser
             return ErrorResult(sampleStepError!);
         }
 
+        string worldGeometryPath = map.TryGetValue("--world-geometry", out string? worldGeometryArgPath)
+            ? worldGeometryArgPath
+            : (environmentReader("CHRONOTAPE_WORLD_GEOMETRY") ?? WorldGeometryConfigLoader.ResolveDefaultPath());
+        if (!WorldGeometryConfigLoader.TryLoad(worldGeometryPath, out WorldGeometryConfig? worldGeometry, out string? worldGeometryError))
+        {
+            return ErrorResult(worldGeometryError!);
+        }
+
         var options = new ProjectionOptions
         {
             FontPath = fullFontPath,
             OutPath = Path.GetFullPath(map.TryGetValue("--out", out string? outPath) ? outPath : "./projection-out"),
             Text = map.TryGetValue("--text", out string? text) && !string.IsNullOrWhiteSpace(text) ? text : "1234",
             TextSize = textSize,
-            SampleStep = sampleStep
+            SampleStep = sampleStep,
+            WorldGeometry = worldGeometry!
         };
 
         return new ProjectionParseResult
@@ -93,13 +105,13 @@ internal static class ProjectionCliParser
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  dotnet run --project ./tape-gen/tape-gen.csproj -- --generate-tape --segment-characters <chars> --main-characters <chars> [--font /path/to/font.ttf] [--tape-out ./tape.png]");
+        Console.WriteLine("  dotnet run --project ./tape-gen/tape-gen.csproj -- --generate-tape --segment-characters <chars> --main-characters <chars> [--world-geometry ./tape-gen/world-geometry.json] [--font /path/to/font.ttf] [--tape-out ./tape.png]");
         Console.WriteLine();
         Console.WriteLine("Tape generation value sources (precedence):");
         Console.WriteLine("  CLI flags > environment variables > --tape-config JSON > defaults");
         Console.WriteLine("  Required values: SegmentCharacters, MainCharacters");
         Console.WriteLine("  Env vars: CHRONOTAPE_SEGMENT_CHARACTERS, CHRONOTAPE_MAIN_CHARACTERS, CHRONOTAPE_FONT_PATH, CHRONOTAPE_OUTPUT_PATH, ...");
-        Console.WriteLine("  Geometry is millimeter-native in --tape-config (Dpi, *Mm fields, SlitWidthMm/SlitHeightMm/SlitCenterYOffsetMm)");
+        Console.WriteLine("  Tape layout values are in --tape-config; shared real-world geometry is in --world-geometry / CHRONOTAPE_WORLD_GEOMETRY.");
         Console.WriteLine("  Glyph mode: legacy renderer by default, font-driven mode when --font/FontPath is provided");
         Console.WriteLine("  Debug visuals: --debug-rects (outlines), --highlight-rects (high-contrast overlay)");
         Console.WriteLine();
@@ -108,7 +120,7 @@ internal static class ProjectionCliParser
         Console.WriteLine();
         Console.WriteLine("Projection debug mode:");
         Console.WriteLine("  dotnet run --project ./tape-gen/tape-gen.csproj -- \\");
-        Console.WriteLine("    --projection-debug --font /absolute/path/to/font.ttf [--out ./projection-out]");
+        Console.WriteLine("    --projection-debug --font /absolute/path/to/font.ttf [--world-geometry ./tape-gen/world-geometry.json] [--out ./projection-out]");
     }
 
     private static bool TryParseInt(
