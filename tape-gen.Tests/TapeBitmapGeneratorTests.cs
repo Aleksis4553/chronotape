@@ -112,7 +112,7 @@ public sealed class TapeBitmapGeneratorTests
     }
 
     [Fact]
-    public void GenerateTapeBitmap_TrimsMainGlyphSoBoundsFollowConfiguredPadding()
+    public void GenerateTapeBitmap_TrimsMainGlyphHorizontallySoBoundsFollowConfiguredXPadding()
     {
         var spec = new TapeSpec
         {
@@ -140,9 +140,7 @@ public sealed class TapeBitmapGeneratorTests
         SKRectI opaqueBounds = FindOpaqueBounds(bitmap);
 
         Assert.True(opaqueBounds.Left <= spec.MainPaddingXPx + 1);
-        Assert.True(opaqueBounds.Top <= spec.MainPaddingYPx + 1);
         Assert.True(opaqueBounds.Right >= (spec.SegmentWidthPx - spec.MainPaddingXPx) - 1);
-        Assert.True(opaqueBounds.Bottom >= (spec.SegmentHeightPx - spec.MainPaddingYPx) - 1);
     }
 
     [Fact]
@@ -162,6 +160,24 @@ public sealed class TapeBitmapGeneratorTests
         using SKBitmap cropped = TapeBitmapGenerator.CropToOpaqueBounds(bitmap, "test");
         Assert.Equal(3, cropped.Width);
         Assert.Equal(3, cropped.Height);
+    }
+
+    [Fact]
+    public void CropToOpaqueBounds_WhenCropVerticalFalse_KeepsFullHeight()
+    {
+        using var bitmap = new SKBitmap(10, 10, SKColorType.Bgra8888, SKAlphaType.Premul);
+        bitmap.Erase(SKColors.Transparent);
+        for (int y = 4; y <= 6; y++)
+        {
+            for (int x = 4; x <= 6; x++)
+            {
+                bitmap.SetPixel(x, y, SKColors.White);
+            }
+        }
+
+        using SKBitmap cropped = TapeBitmapGenerator.CropToOpaqueBounds(bitmap, "test", cropVertical: false);
+        Assert.Equal(3, cropped.Width);
+        Assert.Equal(10, cropped.Height);
     }
 
     private static SKRectI BuildApertureRect(TapeSpec spec)

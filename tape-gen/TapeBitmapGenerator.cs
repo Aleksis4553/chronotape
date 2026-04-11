@@ -244,7 +244,7 @@ internal static class TapeBitmapGenerator
     private static void DrawMainGlyph(SKCanvas canvas, char glyph, SKRectI targetRect, SKTypeface typeface, SKColor color)
     {
         using SKBitmap sourceMask = RenderGlyphMask(glyph, targetRect.Width, targetRect.Height, typeface);
-        using SKBitmap sourceMaskTight = CropToOpaqueBounds(sourceMask, "main");
+        using SKBitmap sourceMaskTight = CropToOpaqueBounds(sourceMask, "main", cropVertical: false);
         using var paint = new SKPaint
         {
             IsAntialias = true,
@@ -421,12 +421,12 @@ internal static class TapeBitmapGenerator
         return bitmap;
     }
 
-    internal static SKBitmap CropToOpaqueBounds(SKBitmap bitmap, string glyphKind)
+    internal static SKBitmap CropToOpaqueBounds(SKBitmap bitmap, string glyphKind, bool cropVertical = true)
     {
         int minX = bitmap.Width;
-        int minY = bitmap.Height;
+        int minY = cropVertical ? bitmap.Height : 0;
         int maxX = -1;
-        int maxY = -1;
+        int maxY = cropVertical ? -1 : bitmap.Height - 1;
 
         for (int y = 0; y < bitmap.Height; y++)
         {
@@ -438,9 +438,12 @@ internal static class TapeBitmapGenerator
                 }
 
                 minX = Math.Min(minX, x);
-                minY = Math.Min(minY, y);
                 maxX = Math.Max(maxX, x);
-                maxY = Math.Max(maxY, y);
+                if (cropVertical)
+                {
+                    minY = Math.Min(minY, y);
+                    maxY = Math.Max(maxY, y);
+                }
             }
         }
 
