@@ -1,7 +1,6 @@
 {
     "SlitWidthMm": 17.78,
     "SlitHeightMm": 17.272,
-    "SlitCenterYOffsetMm": 21.844,
     "SlitCount": 4,
     "SlitSegmentCenterDistanceMm": 50.0,
     "TapeTopHeightFromGroundMm": 0.0,

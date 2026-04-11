@@ -63,15 +63,14 @@ internal static class ProjectionDebugRunner
         var result = new List<Frame>();
         double middleIndex = (geometry.SlitCount - 1) / 2.0;
         Vector3D topShift = ScaleVector(normal, geometry.TapeTopHeightFromGroundMm);
-        Vector3D centerYShift = ScaleVector(up, geometry.SlitCenterYOffsetMm);
 
         for (int i = 0; i < geometry.SlitCount; i++)
         {
             double offset = (i - middleIndex) * geometry.SlitSegmentCenterDistanceMm;
             Point3D center = new Point3D(
-                origin.X + (direction.X * offset) + topShift.X + centerYShift.X,
-                origin.Y + (direction.Y * offset) + topShift.Y + centerYShift.Y,
-                origin.Z + (direction.Z * offset) + topShift.Z + centerYShift.Z
+                origin.X + (direction.X * offset) + topShift.X,
+                origin.Y + (direction.Y * offset) + topShift.Y,
+                origin.Z + (direction.Z * offset) + topShift.Z
             );
             result.Add(new Frame(center, normal, up, geometry.SlitWidthMm, geometry.SlitHeightMm));
         }

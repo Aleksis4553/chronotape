@@ -106,10 +106,11 @@ public sealed class TapeGenerationCliParserTests
           "SegmentHeightMm": 50.8,
           "TopMarginMm": 12.7,
           "MainPaddingMm": 0.5,
-          "DeadzonePaddingMm": 0.5
+          "DeadzonePaddingMm": 0.5,
+          "SlitCenterYOffsetMm": 7.62
         }
         """);
-        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 17.78, slitHeightMm: 30.48, slitCenterYOffsetMm: 7.62);
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 17.78, slitHeightMm: 30.48);
 
         string[] args =
         [
@@ -156,7 +157,7 @@ public sealed class TapeGenerationCliParserTests
     public void Parse_UsesBuiltInMillimeterDefaultsWhenConfigOmitted()
     {
         string tempDir = CreateTempDir();
-        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 9.144, slitHeightMm: 9.144, slitCenterYOffsetMm: 15.494);
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 9.144, slitHeightMm: 9.144);
 
         string[] args =
         [
@@ -178,7 +179,7 @@ public sealed class TapeGenerationCliParserTests
         Assert.Equal(2, result.Spec.DeadzonePaddingPx);
         Assert.Equal(36, result.Spec.SlitWidthPx);
         Assert.Equal(36, result.Spec.SlitHeightPx);
-        Assert.Equal(61, result.Spec.SlitCenterYOffsetPx);
+        Assert.Equal(86, result.Spec.SlitCenterYOffsetPx);
     }
 
     [Fact]
@@ -265,7 +266,6 @@ public sealed class TapeGenerationCliParserTests
         {
           "SlitWidthMm": 0,
           "SlitHeightMm": 10,
-          "SlitCenterYOffsetMm": 1,
           "SlitCount": 4,
           "SlitSegmentCenterDistanceMm": 50,
           "TapeTopHeightFromGroundMm": 0,
@@ -309,15 +309,13 @@ public sealed class TapeGenerationCliParserTests
         string directory,
         int slitCount = 4,
         double slitWidthMm = 17.78,
-        double slitHeightMm = 17.272,
-        double slitCenterYOffsetMm = 21.844)
+        double slitHeightMm = 17.272)
     {
         string worldGeometryPath = Path.Combine(directory, "world-geometry.json");
         File.WriteAllText(worldGeometryPath, $$"""
         {
           "SlitWidthMm": {{slitWidthMm}},
           "SlitHeightMm": {{slitHeightMm}},
-          "SlitCenterYOffsetMm": {{slitCenterYOffsetMm}},
           "SlitCount": {{slitCount}},
           "SlitSegmentCenterDistanceMm": 50.0,
           "TapeTopHeightFromGroundMm": 0.0,

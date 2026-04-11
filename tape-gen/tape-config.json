@@ -8,5 +8,6 @@
     "SegmentHeightMm": 76.2,
     "TopMarginMm": 12.7,
     "MainPaddingMm": 0.0,
-    "DeadzonePaddingMm": 0.508
+    "DeadzonePaddingMm": 0.508,
+    "SlitCenterYOffsetMm": 21.844
 }
