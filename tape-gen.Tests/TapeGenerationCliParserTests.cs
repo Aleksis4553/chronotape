@@ -84,23 +84,34 @@ public sealed class TapeGenerationCliParserTests
     }
 
     [Fact]
-    public void Parse_ConvertsMillimeterValuesWhenDpiProvided()
+    public void Parse_UsesMillimeterGeometryFromConfig()
     {
+        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        string configPath = Path.Combine(tempDir, "tape-config.json");
+        File.WriteAllText(configPath, """
+        {
+          "SegmentCharacters": "9876",
+          "MainCharacters": "6789",
+          "Dpi": 600,
+          "SegmentWidthMm": 25.4,
+          "SegmentHeightMm": 50.8,
+          "TopMarginMm": 12.7,
+          "MainPaddingMm": 0.5,
+          "DeadzonePaddingMm": 0.5,
+          "DeadzoneRectMm": {
+            "Left": 2.54,
+            "Top": 10.16,
+            "Right": 20.32,
+            "Bottom": 40.64
+          }
+        }
+        """);
+
         string[] args =
         [
             "--generate-tape",
-            "--segment-characters", "9876",
-            "--main-characters", "6789",
-            "--dpi", "600",
-            "--segment-width-mm", "25.4",
-            "--segment-height-mm", "50.8",
-            "--top-margin-mm", "12.7",
-            "--main-padding-mm", "0.5",
-            "--deadzone-padding-mm", "0.5",
-            "--deadzone-left-mm", "2.54",
-            "--deadzone-top-mm", "10.16",
-            "--deadzone-right-mm", "20.32",
-            "--deadzone-bottom-mm", "40.64"
+            "--tape-config", configPath
         ];
 
         TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
@@ -120,58 +131,7 @@ public sealed class TapeGenerationCliParserTests
     }
 
     [Fact]
-    public void Parse_PrefersMillimeterValueOverPixelValueWithinSameSource()
-    {
-        string[] args =
-        [
-            "--generate-tape",
-            "--segment-characters", "9876",
-            "--main-characters", "6789",
-            "--dpi", "600",
-            "--segment-width", "123",
-            "--segment-width-mm", "25.4"
-        ];
-
-        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
-
-        Assert.True(result.ShouldRun);
-        Assert.Null(result.Error);
-        Assert.NotNull(result.Spec);
-        Assert.Equal(600, result.Spec.SegmentWidthPx);
-    }
-
-    [Fact]
-    public void Parse_UsesCliMillimetersOverConfigPixels()
-    {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
-        string configPath = Path.Combine(tempDir, "tape-config.json");
-        File.WriteAllText(configPath, """
-        {
-          "SegmentCharacters": "9876",
-          "MainCharacters": "6789",
-          "SegmentWidthPx": 140,
-          "Dpi": 600
-        }
-        """);
-
-        string[] args =
-        [
-            "--generate-tape",
-            "--tape-config", configPath,
-            "--segment-width-mm", "25.4"
-        ];
-
-        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
-
-        Assert.True(result.ShouldRun);
-        Assert.Null(result.Error);
-        Assert.NotNull(result.Spec);
-        Assert.Equal(600, result.Spec.SegmentWidthPx);
-    }
-
-    [Fact]
-    public void Parse_FailsWhenMillimeterValueHasNoDpi()
+    public void Parse_FailsOnGeometryCliFlags()
     {
         string[] args =
         [
@@ -185,7 +145,61 @@ public sealed class TapeGenerationCliParserTests
 
         Assert.True(result.ShouldRun);
         Assert.NotNull(result.Error);
-        Assert.Contains("requires DPI", result.Error);
+        Assert.Contains("Unknown argument for tape generation", result.Error);
+        Assert.Null(result.Spec);
+    }
+
+    [Fact]
+    public void Parse_UsesBuiltInMillimeterDefaultsWhenConfigOmitted()
+    {
+        string[] args =
+        [
+            "--generate-tape",
+            "--segment-characters", "9876",
+            "--main-characters", "6789"
+        ];
+
+        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
+
+        Assert.True(result.ShouldRun);
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Spec);
+        Assert.Equal(140, result.Spec.SegmentWidthPx);
+        Assert.Equal(210, result.Spec.SegmentHeightPx);
+        Assert.Equal(30, result.Spec.TopMarginPx);
+        Assert.Equal(8, result.Spec.MainPaddingPx);
+        Assert.Equal(2, result.Spec.DeadzonePaddingPx);
+        Assert.Equal(52, result.Spec.DeadzoneRectPx.Left);
+        Assert.Equal(148, result.Spec.DeadzoneRectPx.Top);
+        Assert.Equal(88, result.Spec.DeadzoneRectPx.Right);
+        Assert.Equal(184, result.Spec.DeadzoneRectPx.Bottom);
+    }
+
+    [Fact]
+    public void Parse_FailsWhenConfigDpiIsInvalid()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        string configPath = Path.Combine(tempDir, "tape-config.json");
+        File.WriteAllText(configPath, """
+        {
+          "SegmentCharacters": "9876",
+          "MainCharacters": "6789",
+          "Dpi": 0
+        }
+        """);
+
+        string[] args =
+        [
+            "--generate-tape",
+            "--tape-config", configPath
+        ];
+
+        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
+
+        Assert.True(result.ShouldRun);
+        Assert.NotNull(result.Error);
+        Assert.Contains("Dpi in --tape-config must be > 0.", result.Error);
         Assert.Null(result.Spec);
     }
 
