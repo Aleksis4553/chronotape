@@ -330,30 +330,17 @@ internal static class TapeBitmapGenerator
         int slitCount)
     {
         using SKBitmap sourceMask = RenderGlyphMask(glyph, sourceRect.Width, sourceRect.Height, typeface);
-        using SKBitmap sourceMaskTight = CropToOpaqueBounds(sourceMask, "deadzone");
-        List<SampledPixel> sampledPixels = SampleOpaquePixels(sourceMaskTight, ProjectionSampleStep);
+        List<SampledPixel> sampledPixels = SampleOpaquePixels(sourceMask, ProjectionSampleStep);
         if (sampledPixels.Count == 0)
         {
             return;
         }
 
-        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / (float)sourceMaskTight.Width, deadzoneApertureRect.Height / (float)sourceMaskTight.Height);
-        if (desiredScale <= 0f)
-        {
-            throw new InvalidOperationException("Deadzone projection scale is invalid.");
-        }
-
-        float displayDistance = ProjectionLightDistance * ((1f / desiredScale) - 1f);
-        if (displayDistance <= MinimumDisplayDistance)
-        {
-            displayDistance = MinimumDisplayDistance;
-        }
-
         double tiltRadians = ProjectionDisplayTiltDegrees * (Math.PI / 180.0);
-        var displayCenter = new Point3D(0, 0, displayDistance);
+        var displayCenter = new Point3D(0, 0, ProjectionLightDistance);
         var displayNormal = new Vector3D(0, -Math.Sin(tiltRadians), Math.Cos(tiltRadians));
         var displayUp = new Vector3D(0, Math.Cos(tiltRadians), Math.Sin(tiltRadians));
-        Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceMaskTight.Width, sourceMaskTight.Height);
+        Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceRect.Width, sourceRect.Height);
 
         double slitPosition = slitCount == 1 ? 0.0 : ((double)slitIndex / (slitCount - 1)) - 0.5;
         double slitOffsetX = deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition;
@@ -364,12 +351,27 @@ internal static class TapeBitmapGenerator
             deadzoneApertureRect.Width,
             deadzoneApertureRect.Height);
 
+        // Derive the light source as the convergence of rays from each display corner through the
+        // corresponding slit corner. This guarantees that any pixel inside the display projects
+        // inside the slit — no post-projection cropping is needed.
+        var cornerRays = new List<Ray>
+        {
+            new Ray(displayFrame.TopRight, new Vector3D(displayFrame.TopRight, slitFrame.TopRight)),
+            new Ray(displayFrame.TopLeft, new Vector3D(displayFrame.TopLeft, slitFrame.TopLeft)),
+            new Ray(displayFrame.BottomRight, new Vector3D(displayFrame.BottomRight, slitFrame.BottomRight)),
+            new Ray(displayFrame.BottomLeft, new Vector3D(displayFrame.BottomLeft, slitFrame.BottomLeft)),
+        };
+        if (!GeometryMath.GetClosestPointToRays(cornerRays, out Point3D lightSource))
+        {
+            throw new InvalidOperationException("Cannot compute projection light source: display and slit corners do not converge.");
+        }
+
         SlitProjectionResult projection = ProjectionPipeline.ProjectSingleSlit(
             slitIndex,
             sampledPixels,
             displayFrame,
             slitFrame,
-            new Point3D(0, 0, -ProjectionLightDistance));
+            lightSource);
 
         bool[][] projectedBitmap = ProjectionPipeline.BuildSlitLocalBitmap(deadzoneApertureRect.Width, deadzoneApertureRect.Height, slitFrame, projection.Points);
         for (int y = 0; y < projectedBitmap.Length; y++)
