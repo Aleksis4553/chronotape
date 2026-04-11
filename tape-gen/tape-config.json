@@ -6,13 +6,13 @@
     "OutputPath": "./tapes/tape.png",
     "SegmentWidthPx": 150,
     "SegmentHeightPx": 300,
-    "TopMarginPx": 30,
+    "TopMarginPx": 50,
     "MainPaddingPx": 0,
     "DeadzonePaddingPx": 2,
     "DeadzoneRectPx": {
-        "Left": 50,
-        "Top": 160,
-        "Right": 100,
-        "Bottom": 290
+        "Left": 40,
+        "Right": 110,
+        "Top": 202,
+        "Bottom": 270
     }
 }
