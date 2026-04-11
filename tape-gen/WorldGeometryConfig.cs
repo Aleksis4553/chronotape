@@ -4,7 +4,6 @@ internal sealed class WorldGeometryConfig
 {
     public double SlitWidthMm { get; set; }
     public double SlitHeightMm { get; set; }
-    public double SlitCenterYOffsetMm { get; set; }
     public int SlitCount { get; set; }
     public double SlitSegmentCenterDistanceMm { get; set; }
     public double TapeTopHeightFromGroundMm { get; set; }
@@ -98,7 +97,6 @@ internal static class WorldGeometryConfigLoader
 
         if (!ValidatePositiveMm(config.SlitWidthMm, nameof(config.SlitWidthMm), out error)
             || !ValidatePositiveMm(config.SlitHeightMm, nameof(config.SlitHeightMm), out error)
-            || !ValidateFiniteMm(config.SlitCenterYOffsetMm, nameof(config.SlitCenterYOffsetMm), out error)
             || !ValidatePositiveInt(config.SlitCount, nameof(config.SlitCount), out error)
             || !ValidatePositiveMm(config.SlitSegmentCenterDistanceMm, nameof(config.SlitSegmentCenterDistanceMm), out error)
             || !ValidateFiniteMm(config.TapeTopHeightFromGroundMm, nameof(config.TapeTopHeightFromGroundMm), out error)

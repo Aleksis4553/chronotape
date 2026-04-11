@@ -253,9 +253,10 @@ internal static class TapeBitmapGenerator
         int slitCount)
     {
         using SKBitmap sourceMask = RenderGlyphMask(glyph, sourceRect.Width, sourceRect.Height, typeface);
+        using SKBitmap sourceMaskTight = CropToOpaqueBounds(sourceMask);
 
-        float sourceWidth = sourceMask.Width;
-        float sourceHeight = sourceMask.Height;
+        float sourceWidth = sourceMaskTight.Width;
+        float sourceHeight = sourceMaskTight.Height;
 
         float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / sourceWidth, deadzoneApertureRect.Height / sourceHeight);
         if (desiredScale <= 0f)
@@ -278,11 +279,11 @@ internal static class TapeBitmapGenerator
         float projectedOriginX = deadzoneApertureRect.MidX + (deadzoneApertureRect.Width * ProjectionBaseOffsetXRatio) + (deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition);
         float projectedOriginY = deadzoneApertureRect.MidY - (deadzoneApertureRect.Height * ProjectionBaseOffsetYRatio);
 
-        for (int y = 0; y < sourceMask.Height; y++)
+        for (int y = 0; y < sourceMaskTight.Height; y++)
         {
-            for (int x = 0; x < sourceMask.Width; x++)
+            for (int x = 0; x < sourceMaskTight.Width; x++)
             {
-                SKColor maskColor = sourceMask.GetPixel(x, y);
+                SKColor maskColor = sourceMaskTight.GetPixel(x, y);
                 if (maskColor.Alpha == 0)
                 {
                     continue;
@@ -330,13 +331,14 @@ internal static class TapeBitmapGenerator
         int slitCount)
     {
         using SKBitmap sourceMask = RenderGlyphMask(glyph, sourceRect.Width, sourceRect.Height, typeface);
-        List<SampledPixel> sampledPixels = SampleOpaquePixels(sourceMask, ProjectionSampleStep);
+        using SKBitmap sourceMaskTight = CropToOpaqueBounds(sourceMask);
+        List<SampledPixel> sampledPixels = SampleOpaquePixels(sourceMaskTight, ProjectionSampleStep);
         if (sampledPixels.Count == 0)
         {
             return;
         }
 
-        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / (float)sourceMask.Width, deadzoneApertureRect.Height / (float)sourceMask.Height);
+        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / (float)sourceMaskTight.Width, deadzoneApertureRect.Height / (float)sourceMaskTight.Height);
         if (desiredScale <= 0f)
         {
             throw new InvalidOperationException("Deadzone projection scale is invalid.");
@@ -352,7 +354,7 @@ internal static class TapeBitmapGenerator
         var displayCenter = new Point3D(0, 0, displayDistance);
         var displayNormal = new Vector3D(0, -Math.Sin(tiltRadians), Math.Cos(tiltRadians));
         var displayUp = new Vector3D(0, Math.Cos(tiltRadians), Math.Sin(tiltRadians));
-        Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceMask.Width, sourceMask.Height);
+        Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceMaskTight.Width, sourceMaskTight.Height);
 
         double slitPosition = slitCount == 1 ? 0.0 : ((double)slitIndex / (slitCount - 1)) - 0.5;
         double slitOffsetX = deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition;
@@ -404,6 +406,43 @@ internal static class TapeBitmapGenerator
         float fontSize = FindLargestFittingCellTextSize(width, height, typeface);
         DrawGlyphCenteredByCell(canvas, glyph, new SKRectI(0, 0, width, height), typeface, SKColors.White, fontSize);
         return bitmap;
+    }
+
+    private static SKBitmap CropToOpaqueBounds(SKBitmap bitmap)
+    {
+        int minX = bitmap.Width;
+        int minY = bitmap.Height;
+        int maxX = -1;
+        int maxY = -1;
+
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y).Alpha == 0)
+                {
+                    continue;
+                }
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x);
+                maxY = Math.Max(maxY, y);
+            }
+        }
+
+        if (maxX < minX || maxY < minY)
+        {
+            return new SKBitmap(1, 1, bitmap.ColorType, bitmap.AlphaType);
+        }
+
+        int width = maxX - minX + 1;
+        int height = maxY - minY + 1;
+        var cropped = new SKBitmap(width, height, bitmap.ColorType, bitmap.AlphaType);
+        using var canvas = new SKCanvas(cropped);
+        canvas.Clear(SKColors.Transparent);
+        canvas.DrawBitmap(bitmap, new SKRectI(minX, minY, maxX + 1, maxY + 1), new SKRectI(0, 0, width, height));
+        return cropped;
     }
 
     private static List<SampledPixel> SampleOpaquePixels(SKBitmap bitmap, int step)

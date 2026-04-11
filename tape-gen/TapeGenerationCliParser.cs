@@ -19,6 +19,7 @@ internal static class TapeGenerationCliParser
     private const double DefaultTopMarginMm = 7.62d;
     private const double DefaultMainPaddingMm = 2.032d;
     private const double DefaultDeadzonePaddingMm = 0.508d;
+    private const double DefaultSlitCenterYOffsetMm = 21.844d;
     private static readonly HashSet<string> SupportedArguments =
     [
         GenerateFlag,
@@ -204,9 +205,9 @@ internal static class TapeGenerationCliParser
         }
 
         if (!TryResolveDimensionPxFromConfig(
-            worldGeometry.SlitCenterYOffsetMm,
+            config.SlitCenterYOffsetMm,
             "SlitCenterYOffsetMm",
-            defaultValueMm: worldGeometry.SlitCenterYOffsetMm,
+            defaultValueMm: DefaultSlitCenterYOffsetMm,
             dpi,
             out int slitCenterYOffsetPx,
             out string? slitCenterYOffsetError))
@@ -466,6 +467,7 @@ internal sealed class TapeConfigFile
     public string? FontFamily { get; set; }
     public double? MainPaddingMm { get; set; }
     public double? DeadzonePaddingMm { get; set; }
+    public double? SlitCenterYOffsetMm { get; set; }
     public double? Dpi { get; set; }
     public string? OutputPath { get; set; }
     public bool? DebugDrawRects { get; set; }
