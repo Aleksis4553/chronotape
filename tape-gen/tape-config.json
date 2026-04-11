@@ -1,0 +1,18 @@
+{
+    "SegmentCharacters": "123",
+    "MainCharacters": "123",
+    "Offset": 1,
+    "SlitCount": 4,
+    "OutputPath": "./tapes/tape.png",
+    "SegmentWidthPx": 140,
+    "SegmentHeightPx": 210,
+    "TopMarginPx": 30,
+    "MainPaddingPx": 8,
+    "DeadzonePaddingPx": 2,
+    "DeadzoneRectPx": {
+        "Left": 52,
+        "Top": 148,
+        "Right": 88,
+        "Bottom": 190
+    }
+}
