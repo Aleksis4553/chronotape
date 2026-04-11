@@ -19,17 +19,11 @@ internal static class TapeGenerationCliParser
     private const double DefaultTopMarginMm = 7.62d;
     private const double DefaultMainPaddingMm = 2.032d;
     private const double DefaultDeadzonePaddingMm = 0.508d;
-    private const double DefaultDeadzoneLeftMm = 13.208d;
-    private const double DefaultDeadzoneTopMm = 37.592d;
-    private const double DefaultDeadzoneRightMm = 22.352d;
-    private const double DefaultDeadzoneBottomMm = 46.736d;
-    private const double DefaultSlitWidthMm = 9.144d;
-    private const double DefaultSlitHeightMm = 9.144d;
-    private const double DefaultSlitCenterYOffsetMm = 15.494d;
     private static readonly HashSet<string> SupportedArguments =
     [
         GenerateFlag,
         "--tape-config",
+        "--world-geometry",
         "--tape-out",
         "--segment-characters",
         "--main-characters",
@@ -107,9 +101,23 @@ internal static class TapeGenerationCliParser
             return ErrorResult(offsetError!);
         }
 
-        if (!TryResolveInt(argsMap, environmentReader, "--slit-count", "CHRONOTAPE_SLIT_COUNT", config.SlitCount, defaultValue: 1, out int slitCount, out string? slitCountError))
+        string worldGeometryPath = FirstNonEmpty(
+            GetArg(argsMap, "--world-geometry"),
+            environmentReader("CHRONOTAPE_WORLD_GEOMETRY"),
+            WorldGeometryConfigLoader.ResolveDefaultPath())!;
+        if (!WorldGeometryConfigLoader.TryLoad(worldGeometryPath, out WorldGeometryConfig? worldGeometry, out string? worldGeometryError))
+        {
+            return ErrorResult(worldGeometryError!);
+        }
+
+        if (!TryResolveInt(argsMap, environmentReader, "--slit-count", "CHRONOTAPE_SLIT_COUNT", null, defaultValue: worldGeometry!.SlitCount, out int slitCount, out string? slitCountError))
         {
             return ErrorResult(slitCountError!);
+        }
+
+        if (slitCount != worldGeometry!.SlitCount)
+        {
+            return ErrorResult($"Slit count must match world geometry ({worldGeometry.SlitCount}). Update --world-geometry instead of using --slit-count.");
         }
 
         double dpi = config.Dpi ?? DefaultDpi;
@@ -174,61 +182,9 @@ internal static class TapeGenerationCliParser
         }
 
         if (!TryResolveDimensionPxFromConfig(
-            config.DeadzoneRectMm?.Left,
-            "DeadzoneRectMm.Left",
-            defaultValueMm: DefaultDeadzoneLeftMm,
-            dpi,
-            out int deadzoneLeft,
-            out string? deadzoneLeftError))
-        {
-            return ErrorResult(deadzoneLeftError!);
-        }
-
-        if (!TryResolveDimensionPxFromConfig(
-            config.DeadzoneRectMm?.Top,
-            "DeadzoneRectMm.Top",
-            defaultValueMm: DefaultDeadzoneTopMm,
-            dpi,
-            out int deadzoneTop,
-            out string? deadzoneTopError))
-        {
-            return ErrorResult(deadzoneTopError!);
-        }
-
-        if (!TryResolveDimensionPxFromConfig(
-            config.DeadzoneRectMm?.Right,
-            "DeadzoneRectMm.Right",
-            defaultValueMm: DefaultDeadzoneRightMm,
-            dpi,
-            out int deadzoneRight,
-            out string? deadzoneRightError))
-        {
-            return ErrorResult(deadzoneRightError!);
-        }
-
-        if (!TryResolveDimensionPxFromConfig(
-            config.DeadzoneRectMm?.Bottom,
-            "DeadzoneRectMm.Bottom",
-            defaultValueMm: DefaultDeadzoneBottomMm,
-            dpi,
-            out int deadzoneBottom,
-            out string? deadzoneBottomError))
-        {
-            return ErrorResult(deadzoneBottomError!);
-        }
-
-        int legacySlitWidthPx = deadzoneRight - deadzoneLeft;
-        int legacySlitHeightPx = deadzoneBottom - deadzoneTop;
-        double legacyDeadzoneCenterYPx = (deadzoneTop + deadzoneBottom) / 2d;
-        double legacySegmentCenterYPx = segmentHeightPx / 2d;
-        int legacySlitCenterYOffsetPx = (int)Math.Round(
-            legacyDeadzoneCenterYPx - legacySegmentCenterYPx,
-            MidpointRounding.AwayFromZero);
-
-        if (!TryResolveDimensionPxFromConfig(
-            config.SlitWidthMm,
+            worldGeometry.SlitWidthMm,
             "SlitWidthMm",
-            defaultValueMm: DefaultSlitWidthMm,
+            defaultValueMm: worldGeometry.SlitWidthMm,
             dpi,
             out int slitWidthPx,
             out string? slitWidthError))
@@ -237,9 +193,9 @@ internal static class TapeGenerationCliParser
         }
 
         if (!TryResolveDimensionPxFromConfig(
-            config.SlitHeightMm,
+            worldGeometry.SlitHeightMm,
             "SlitHeightMm",
-            defaultValueMm: DefaultSlitHeightMm,
+            defaultValueMm: worldGeometry.SlitHeightMm,
             dpi,
             out int slitHeightPx,
             out string? slitHeightError))
@@ -247,26 +203,15 @@ internal static class TapeGenerationCliParser
             return ErrorResult(slitHeightError!);
         }
 
-        if (config.DeadzoneRectMm is not null)
-        {
-            slitWidthPx = config.SlitWidthMm.HasValue ? slitWidthPx : legacySlitWidthPx;
-            slitHeightPx = config.SlitHeightMm.HasValue ? slitHeightPx : legacySlitHeightPx;
-        }
-
         if (!TryResolveDimensionPxFromConfig(
-            config.SlitCenterYOffsetMm,
+            worldGeometry.SlitCenterYOffsetMm,
             "SlitCenterYOffsetMm",
-            defaultValueMm: DefaultSlitCenterYOffsetMm,
+            defaultValueMm: worldGeometry.SlitCenterYOffsetMm,
             dpi,
             out int slitCenterYOffsetPx,
             out string? slitCenterYOffsetError))
         {
             return ErrorResult(slitCenterYOffsetError!);
-        }
-
-        if (config.DeadzoneRectMm is not null && !config.SlitCenterYOffsetMm.HasValue)
-        {
-            slitCenterYOffsetPx = legacySlitCenterYOffsetPx;
         }
 
         bool debugRects = ResolveBool(
@@ -310,7 +255,7 @@ internal static class TapeGenerationCliParser
             SegmentCharacters = segmentCharacters,
             MainCharacters = mainCharacters,
             Offset = offset,
-            SlitCount = slitCount,
+            SlitCount = worldGeometry.SlitCount,
             SegmentWidthPx = segmentWidthPx,
             SegmentHeightPx = segmentHeightPx,
             TopMarginPx = topMarginPx,
@@ -514,14 +459,9 @@ internal sealed class TapeConfigFile
     public string? SegmentCharacters { get; set; }
     public string? MainCharacters { get; set; }
     public int? Offset { get; set; }
-    public int? SlitCount { get; set; }
     public double? SegmentWidthMm { get; set; }
     public double? SegmentHeightMm { get; set; }
     public double? TopMarginMm { get; set; }
-    public double? SlitWidthMm { get; set; }
-    public double? SlitHeightMm { get; set; }
-    public double? SlitCenterYOffsetMm { get; set; }
-    public TapeRectMmConfig? DeadzoneRectMm { get; set; }
     public string? FontPath { get; set; }
     public string? FontFamily { get; set; }
     public double? MainPaddingMm { get; set; }
@@ -530,12 +470,4 @@ internal sealed class TapeConfigFile
     public string? OutputPath { get; set; }
     public bool? DebugDrawRects { get; set; }
     public bool? DebugHighlightRects { get; set; }
-}
-
-internal sealed class TapeRectMmConfig
-{
-    public double? Left { get; set; }
-    public double? Top { get; set; }
-    public double? Right { get; set; }
-    public double? Bottom { get; set; }
 }

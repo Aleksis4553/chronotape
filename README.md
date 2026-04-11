@@ -41,7 +41,12 @@ Input precedence:
 3. `--tape-config <path-to-json>`
 4. Built-in non-sample defaults (layout/output defaults only)
 
-Geometry is config-driven and millimeter-native. Geometry values are read from `--tape-config` (or built-in defaults) and converted to pixels for rasterization only.
+Chronotape now uses two config files as source-of-truth:
+
+1. `--tape-config` for tape-specific values (characters, DPI, paddings, output/font, etc.)
+2. `--world-geometry` for shared real-world geometry in millimeters (slits, planes, spacing, display segment sizes)
+
+Tape generation converts millimeters to pixels only for rasterization.
 
 Required values (must be provided via CLI/env/config):
 
@@ -71,14 +76,20 @@ Millimeter values are converted with:
 
 `Dpi` is defined in config JSON.
 
-Supported geometry config fields:
+Supported `--tape-config` geometry fields:
 
 - `Dpi`
 - `SegmentWidthMm`, `SegmentHeightMm`, `TopMarginMm`
 - `MainPaddingMm`, `DeadzonePaddingMm`
-- `SlitWidthMm`, `SlitHeightMm`, `SlitCenterYOffsetMm`
 
-`SlitWidthMm`/`SlitHeightMm` define the projection aperture size directly (same as slit size). `SlitCenterYOffsetMm` controls vertical placement relative to segment center; horizontal placement is always centered. `DeadzonePaddingMm` is applied only as final clipping inside that aperture.
+`DeadzonePaddingMm` is applied only as final clipping inside the slit aperture.
+
+Shared physical geometry fields are defined in `world-geometry.json` and include:
+
+- `SlitWidthMm`, `SlitHeightMm`, `SlitCenterYOffsetMm`
+- `SlitCount`, `SlitSegmentCenterDistanceMm`, `TapeTopHeightFromGroundMm`
+- `DisplayedSegmentWidthMm`, `DisplayedSegmentHeightMm`, `DisplayedSegmentCenterDistanceMm`
+- tape plane / slit orientation vectors and display plane point/normal/up vectors
 
 ### Generate using config only (including `FontPath`)
 
@@ -89,16 +100,12 @@ Supported geometry config fields:
   "SegmentCharacters": "7391",
   "MainCharacters": "9137",
   "Offset": 1,
-  "SlitCount": 2,
   "Dpi": 600,
   "SegmentWidthMm": 25.4,
   "SegmentHeightMm": 50.8,
   "TopMarginMm": 12.7,
   "MainPaddingMm": 0.5,
   "DeadzonePaddingMm": 0.5,
-  "SlitWidthMm": 17.78,
-  "SlitHeightMm": 30.48,
-  "SlitCenterYOffsetMm": 7.62,
   "FontPath": "/absolute/path/to/font.ttf",
   "OutputPath": "./tape-font.png"
 }
@@ -107,17 +114,19 @@ Supported geometry config fields:
 Run:
 
 ```bash
-dotnet run --project ./tape-gen/tape-gen.csproj -- \
+  dotnet run --project ./tape-gen/tape-gen.csproj -- \
   --generate-tape \
-  --tape-config ./tape-config.json
+  --tape-config ./tape-config.json \
+  --world-geometry ./tape-gen/world-geometry.json
 ```
 
 ### Generate using config + CLI overrides
 
 ```bash
-dotnet run --project ./tape-gen/tape-gen.csproj -- \
+  dotnet run --project ./tape-gen/tape-gen.csproj -- \
   --generate-tape \
   --tape-config ./tape-config.json \
+  --world-geometry ./tape-gen/world-geometry.json \
   --font /absolute/path/to/override-font.otf \
   --offset 3 \
   --tape-out ./tape-overridden.png
@@ -131,6 +140,7 @@ Use debug mode only when tuning geometry/projection artifacts:
 dotnet run --project ./tape-gen/tape-gen.csproj -- \
   --projection-debug \
   --font /absolute/path/to/font.ttf \
+  --world-geometry ./tape-gen/world-geometry.json \
   --out ./projection-debug
 ```
 

@@ -7,6 +7,7 @@ internal sealed class ProjectionOptions
     public string Text { get; set; } = "1234";
     public int TextSize { get; set; } = 200;
     public int SampleStep { get; set; } = 2;
+    public WorldGeometryConfig WorldGeometry { get; set; } = new();
 }
 
 internal sealed class ProjectionParseResult

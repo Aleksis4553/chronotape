@@ -3,15 +3,6 @@ using SkiaSharp;
 
 internal static class ProjectionDebugRunner
 {
-    private const double DisplayedWidth = 150;
-    private const double DisplayedHeight = 300;
-    private const double DisplayedSegmentCenterDistance = 160;
-    private const double SlitWidth = 5;
-    private const double SlitHeight = 10;
-    private const double SlitSegmentCenterDistance = 50;
-    private const int SlitAmount = 4;
-    private const double TapeTopHeightFromGround = 0;
-
     public static void Run(ProjectionOptions options)
     {
         Directory.CreateDirectory(options.OutPath);
@@ -28,19 +19,21 @@ internal static class ProjectionDebugRunner
             SaveBoolBitmap(renderedBitmap, Path.Combine(renderedDir, $"{charIndex:D2}-{Sanitize(sample.Character)}.png"));
         }
 
-        Point3D chronotapeFrameOrigin = new Point3D(0, 0, 0);
-        Vector3D slitFramesDirection = new Vector3D(1, 0, 0);
-        Vector3D slitFrameNormal = new Vector3D(0, 0, 1);
-        Vector3D surfaceNormal = new Vector3D(0, 0, 1);
-        Point3D surfacePoint = new Point3D(0, 0, 2000);
+        WorldGeometryConfig geometry = options.WorldGeometry;
+        Point3D chronotapeFrameOrigin = new Point3D(geometry.TapeOriginMm.XMm, geometry.TapeOriginMm.YMm, geometry.TapeOriginMm.ZMm);
+        Vector3D slitFramesDirection = NormalizeVector(new Vector3D(geometry.SlitDirection.X, geometry.SlitDirection.Y, geometry.SlitDirection.Z));
+        Vector3D slitFrameNormal = NormalizeVector(new Vector3D(geometry.SlitNormal.X, geometry.SlitNormal.Y, geometry.SlitNormal.Z));
+        Vector3D slitFrameUpDirection = NormalizeVector(new Vector3D(geometry.SlitUpDirection.X, geometry.SlitUpDirection.Y, geometry.SlitUpDirection.Z));
+        Vector3D surfaceNormal = NormalizeVector(new Vector3D(geometry.DisplayPlaneNormal.X, geometry.DisplayPlaneNormal.Y, geometry.DisplayPlaneNormal.Z));
+        Point3D surfacePoint = new Point3D(geometry.DisplayPlanePointMm.XMm, geometry.DisplayPlanePointMm.YMm, geometry.DisplayPlanePointMm.ZMm);
         Plane displaySurface = new Plane(surfaceNormal, surfacePoint);
 
-        List<Frame> slits = BuildSlits(chronotapeFrameOrigin, slitFramesDirection, slitFrameNormal);
-        Vector3D surfaceUp = Vector3D.Cross(displaySurface.Normal, slitFramesDirection);
-        List<Frame> displayedSegments = BuildDisplayedSegments(displaySurface, slitFramesDirection, surfaceUp);
+        List<Frame> slits = BuildSlits(chronotapeFrameOrigin, slitFramesDirection, slitFrameNormal, slitFrameUpDirection, geometry);
+        Vector3D surfaceUp = NormalizeVector(new Vector3D(geometry.DisplayPlaneUpDirection.X, geometry.DisplayPlaneUpDirection.Y, geometry.DisplayPlaneUpDirection.Z));
+        List<Frame> displayedSegments = BuildDisplayedSegments(displaySurface, slitFramesDirection, surfaceUp, geometry);
         Point3D?[] lightSources = ComputeLightSources(slits, displayedSegments);
 
-        for (int slitIndex = 0; slitIndex < SlitAmount; slitIndex++)
+        for (int slitIndex = 0; slitIndex < slits.Count; slitIndex++)
         {
             if (!lightSources[slitIndex].HasValue)
             {
@@ -65,39 +58,41 @@ internal static class ProjectionDebugRunner
         }
     }
 
-    private static List<Frame> BuildSlits(Point3D origin, Vector3D direction, Vector3D normal)
+    private static List<Frame> BuildSlits(Point3D origin, Vector3D direction, Vector3D normal, Vector3D up, WorldGeometryConfig geometry)
     {
         var result = new List<Frame>();
-        double middleIndex = (SlitAmount - 1) / 2.0;
+        double middleIndex = (geometry.SlitCount - 1) / 2.0;
+        Vector3D topShift = ScaleVector(normal, geometry.TapeTopHeightFromGroundMm);
+        Vector3D centerYShift = ScaleVector(up, geometry.SlitCenterYOffsetMm);
 
-        for (int i = 0; i < SlitAmount; i++)
+        for (int i = 0; i < geometry.SlitCount; i++)
         {
-            double offset = (i - middleIndex) * SlitSegmentCenterDistance;
+            double offset = (i - middleIndex) * geometry.SlitSegmentCenterDistanceMm;
             Point3D center = new Point3D(
-                origin.X + (direction.X * offset),
-                origin.Y + (direction.Y * offset),
-                origin.Z + (direction.Z * offset) + TapeTopHeightFromGround
+                origin.X + (direction.X * offset) + topShift.X + centerYShift.X,
+                origin.Y + (direction.Y * offset) + topShift.Y + centerYShift.Y,
+                origin.Z + (direction.Z * offset) + topShift.Z + centerYShift.Z
             );
-            result.Add(new Frame(center, normal, new Vector3D(0, 1, 0), SlitWidth, SlitHeight));
+            result.Add(new Frame(center, normal, up, geometry.SlitWidthMm, geometry.SlitHeightMm));
         }
 
         return result;
     }
 
-    private static List<Frame> BuildDisplayedSegments(Plane surface, Vector3D direction, Vector3D up)
+    private static List<Frame> BuildDisplayedSegments(Plane surface, Vector3D direction, Vector3D up, WorldGeometryConfig geometry)
     {
         var result = new List<Frame>();
-        double middleIndex = (SlitAmount - 1) / 2.0;
+        double middleIndex = (geometry.SlitCount - 1) / 2.0;
 
-        for (int i = 0; i < SlitAmount; i++)
+        for (int i = 0; i < geometry.SlitCount; i++)
         {
-            double offset = (i - middleIndex) * DisplayedSegmentCenterDistance;
+            double offset = (i - middleIndex) * geometry.DisplayedSegmentCenterDistanceMm;
             Point3D center = new Point3D(
                 surface.Point.X + (direction.X * offset),
                 surface.Point.Y + (direction.Y * offset),
                 surface.Point.Z + (direction.Z * offset)
             );
-            result.Add(new Frame(center, surface.Normal, up, DisplayedWidth, DisplayedHeight));
+            result.Add(new Frame(center, surface.Normal, up, geometry.DisplayedSegmentWidthMm, geometry.DisplayedSegmentHeightMm));
         }
 
         return result;
@@ -105,9 +100,9 @@ internal static class ProjectionDebugRunner
 
     private static Point3D?[] ComputeLightSources(List<Frame> slits, List<Frame> displayedSegments)
     {
-        var sources = new Point3D?[SlitAmount];
+        var sources = new Point3D?[slits.Count];
 
-        for (int i = 0; i < SlitAmount; i++)
+        for (int i = 0; i < slits.Count; i++)
         {
             Frame display = displayedSegments[i];
             Frame slit = slits[i];
@@ -130,6 +125,15 @@ internal static class ProjectionDebugRunner
 
         return sources;
     }
+
+    private static Vector3D NormalizeVector(Vector3D vector)
+    {
+        double length = Math.Sqrt((vector.X * vector.X) + (vector.Y * vector.Y) + (vector.Z * vector.Z));
+        return new Vector3D(vector.X / length, vector.Y / length, vector.Z / length);
+    }
+
+    private static Vector3D ScaleVector(Vector3D vector, double scalar) =>
+        new Vector3D(vector.X * scalar, vector.Y * scalar, vector.Z * scalar);
 
     private static void SaveBoolBitmap(bool[][] bitmap, string path)
     {

@@ -5,6 +5,9 @@ public sealed class TapeGenerationCliParserTests
     [Fact]
     public void Parse_UsesActualValuesProvidedByCli()
     {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitCount: 2);
+
         string[] args =
         [
             "--generate-tape",
@@ -12,6 +15,7 @@ public sealed class TapeGenerationCliParserTests
             "--main-characters", "6789",
             "--offset", "1",
             "--slit-count", "2",
+            "--world-geometry", worldGeometryPath,
             "--tape-out", "./actual-tape.png"
         ];
 
@@ -43,8 +47,8 @@ public sealed class TapeGenerationCliParserTests
     [Fact]
     public void Parse_UsesFontPathFromCliWhenProvided()
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir);
         string fontPath = Path.Combine(tempDir, "fake.ttf");
         File.WriteAllBytes(fontPath, [0x00]);
 
@@ -53,6 +57,7 @@ public sealed class TapeGenerationCliParserTests
             "--generate-tape",
             "--segment-characters", "9876",
             "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath,
             "--font", fontPath
         ];
 
@@ -67,11 +72,15 @@ public sealed class TapeGenerationCliParserTests
     [Fact]
     public void Parse_FailsWhenConfiguredFontPathDoesNotExist()
     {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir);
+
         string[] args =
         [
             "--generate-tape",
             "--segment-characters", "9876",
             "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath,
             "--font", "/definitely/missing/font.ttf"
         ];
 
@@ -84,10 +93,9 @@ public sealed class TapeGenerationCliParserTests
     }
 
     [Fact]
-    public void Parse_UsesMillimeterGeometryFromConfig()
+    public void Parse_UsesMillimeterGeometryFromConfigAndWorldGeometry()
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
+        string tempDir = CreateTempDir();
         string configPath = Path.Combine(tempDir, "tape-config.json");
         File.WriteAllText(configPath, """
         {
@@ -98,17 +106,16 @@ public sealed class TapeGenerationCliParserTests
           "SegmentHeightMm": 50.8,
           "TopMarginMm": 12.7,
           "MainPaddingMm": 0.5,
-          "DeadzonePaddingMm": 0.5,
-          "SlitWidthMm": 17.78,
-          "SlitHeightMm": 30.48,
-          "SlitCenterYOffsetMm": 7.62
+          "DeadzonePaddingMm": 0.5
         }
         """);
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 17.78, slitHeightMm: 30.48, slitCenterYOffsetMm: 7.62);
 
         string[] args =
         [
             "--generate-tape",
-            "--tape-config", configPath
+            "--tape-config", configPath,
+            "--world-geometry", worldGeometryPath
         ];
 
         TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
@@ -148,11 +155,15 @@ public sealed class TapeGenerationCliParserTests
     [Fact]
     public void Parse_UsesBuiltInMillimeterDefaultsWhenConfigOmitted()
     {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitWidthMm: 9.144, slitHeightMm: 9.144, slitCenterYOffsetMm: 15.494);
+
         string[] args =
         [
             "--generate-tape",
             "--segment-characters", "9876",
-            "--main-characters", "6789"
+            "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath
         ];
 
         TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
@@ -171,86 +182,9 @@ public sealed class TapeGenerationCliParserTests
     }
 
     [Fact]
-    public void Parse_DerivesSlitGeometryFromLegacyDeadzoneRectWhenNeeded()
-    {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
-        string configPath = Path.Combine(tempDir, "tape-config.json");
-        File.WriteAllText(configPath, """
-        {
-          "SegmentCharacters": "9876",
-          "MainCharacters": "6789",
-          "Dpi": 600,
-          "SegmentHeightMm": 50.8,
-          "DeadzoneRectMm": {
-            "Left": 2.54,
-            "Top": 10.16,
-            "Right": 20.32,
-            "Bottom": 40.64
-          }
-        }
-        """);
-
-        string[] args =
-        [
-            "--generate-tape",
-            "--tape-config", configPath
-        ];
-
-        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
-
-        Assert.True(result.ShouldRun);
-        Assert.Null(result.Error);
-        Assert.NotNull(result.Spec);
-        Assert.Equal(420, result.Spec.SlitWidthPx);
-        Assert.Equal(720, result.Spec.SlitHeightPx);
-        Assert.Equal(0, result.Spec.SlitCenterYOffsetPx);
-    }
-
-    [Fact]
-    public void Parse_PrefersExplicitSlitFieldsOverLegacyDeadzoneRect()
-    {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
-        string configPath = Path.Combine(tempDir, "tape-config.json");
-        File.WriteAllText(configPath, """
-        {
-          "SegmentCharacters": "9876",
-          "MainCharacters": "6789",
-          "Dpi": 600,
-          "SlitWidthMm": 10.16,
-          "SlitHeightMm": 12.7,
-          "SlitCenterYOffsetMm": 5.08,
-          "DeadzoneRectMm": {
-            "Left": 2.54,
-            "Top": 10.16,
-            "Right": 20.32,
-            "Bottom": 40.64
-          }
-        }
-        """);
-
-        string[] args =
-        [
-            "--generate-tape",
-            "--tape-config", configPath
-        ];
-
-        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
-
-        Assert.True(result.ShouldRun);
-        Assert.Null(result.Error);
-        Assert.NotNull(result.Spec);
-        Assert.Equal(240, result.Spec.SlitWidthPx);
-        Assert.Equal(300, result.Spec.SlitHeightPx);
-        Assert.Equal(120, result.Spec.SlitCenterYOffsetPx);
-    }
-
-    [Fact]
     public void Parse_FailsWhenConfigDpiIsInvalid()
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(tempDir);
+        string tempDir = CreateTempDir();
         string configPath = Path.Combine(tempDir, "tape-config.json");
         File.WriteAllText(configPath, """
         {
@@ -259,11 +193,13 @@ public sealed class TapeGenerationCliParserTests
           "Dpi": 0
         }
         """);
+        string worldGeometryPath = WriteWorldGeometry(tempDir);
 
         string[] args =
         [
             "--generate-tape",
-            "--tape-config", configPath
+            "--tape-config", configPath,
+            "--world-geometry", worldGeometryPath
         ];
 
         TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
@@ -277,11 +213,15 @@ public sealed class TapeGenerationCliParserTests
     [Fact]
     public void Parse_SetsHighlightRectFlag()
     {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir);
+
         string[] args =
         [
             "--generate-tape",
             "--segment-characters", "9876",
             "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath,
             "--highlight-rects"
         ];
 
@@ -291,5 +231,137 @@ public sealed class TapeGenerationCliParserTests
         Assert.Null(result.Error);
         Assert.NotNull(result.Spec);
         Assert.True(result.Spec.DebugHighlightRects);
+    }
+
+    [Fact]
+    public void Parse_FailsWhenSlitCountDiffersFromWorldGeometry()
+    {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = WriteWorldGeometry(tempDir, slitCount: 4);
+
+        string[] args =
+        [
+            "--generate-tape",
+            "--segment-characters", "9876",
+            "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath,
+            "--slit-count", "2"
+        ];
+
+        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
+
+        Assert.True(result.ShouldRun);
+        Assert.NotNull(result.Error);
+        Assert.Contains("must match world geometry", result.Error);
+        Assert.Null(result.Spec);
+    }
+
+    [Fact]
+    public void Parse_FailsWhenWorldGeometryFieldIsMissingOrInvalid()
+    {
+        string tempDir = CreateTempDir();
+        string worldGeometryPath = Path.Combine(tempDir, "world-geometry.json");
+        File.WriteAllText(worldGeometryPath, """
+        {
+          "SlitWidthMm": 0,
+          "SlitHeightMm": 10,
+          "SlitCenterYOffsetMm": 1,
+          "SlitCount": 4,
+          "SlitSegmentCenterDistanceMm": 50,
+          "TapeTopHeightFromGroundMm": 0,
+          "DisplayedSegmentWidthMm": 150,
+          "DisplayedSegmentHeightMm": 300,
+          "DisplayedSegmentCenterDistanceMm": 160,
+          "TapeOriginMm": { "XMm": 0, "YMm": 0, "ZMm": 0 },
+          "SlitDirection": { "X": 1, "Y": 0, "Z": 0 },
+          "SlitNormal": { "X": 0, "Y": 0, "Z": 1 },
+          "SlitUpDirection": { "X": 0, "Y": 1, "Z": 0 },
+          "DisplayPlanePointMm": { "XMm": 0, "YMm": 0, "ZMm": 2000 },
+          "DisplayPlaneNormal": { "X": 0, "Y": 0, "Z": 1 },
+          "DisplayPlaneUpDirection": { "X": 0, "Y": 1, "Z": 0 }
+        }
+        """);
+
+        string[] args =
+        [
+            "--generate-tape",
+            "--segment-characters", "9876",
+            "--main-characters", "6789",
+            "--world-geometry", worldGeometryPath
+        ];
+
+        TapeGenerationParseResult result = TapeGenerationCliParser.Parse(args, _ => null);
+
+        Assert.True(result.ShouldRun);
+        Assert.NotNull(result.Error);
+        Assert.Contains("SlitWidthMm", result.Error);
+        Assert.Null(result.Spec);
+    }
+
+    private static string CreateTempDir()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "chronotape-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        return tempDir;
+    }
+
+    private static string WriteWorldGeometry(
+        string directory,
+        int slitCount = 4,
+        double slitWidthMm = 17.78,
+        double slitHeightMm = 17.272,
+        double slitCenterYOffsetMm = 21.844)
+    {
+        string worldGeometryPath = Path.Combine(directory, "world-geometry.json");
+        File.WriteAllText(worldGeometryPath, $$"""
+        {
+          "SlitWidthMm": {{slitWidthMm}},
+          "SlitHeightMm": {{slitHeightMm}},
+          "SlitCenterYOffsetMm": {{slitCenterYOffsetMm}},
+          "SlitCount": {{slitCount}},
+          "SlitSegmentCenterDistanceMm": 50.0,
+          "TapeTopHeightFromGroundMm": 0.0,
+          "DisplayedSegmentWidthMm": 150.0,
+          "DisplayedSegmentHeightMm": 300.0,
+          "DisplayedSegmentCenterDistanceMm": 160.0,
+          "TapeOriginMm": {
+            "XMm": 0.0,
+            "YMm": 0.0,
+            "ZMm": 0.0
+          },
+          "SlitDirection": {
+            "X": 1.0,
+            "Y": 0.0,
+            "Z": 0.0
+          },
+          "SlitNormal": {
+            "X": 0.0,
+            "Y": 0.0,
+            "Z": 1.0
+          },
+          "SlitUpDirection": {
+            "X": 0.0,
+            "Y": 1.0,
+            "Z": 0.0
+          },
+          "DisplayPlanePointMm": {
+            "XMm": 0.0,
+            "YMm": 0.0,
+            "ZMm": 2000.0
+          },
+          "DisplayPlaneNormal": {
+            "X": 0.0,
+            "Y": 0.0,
+            "Z": 1.0
+          },
+          "DisplayPlaneUpDirection": {
+            "X": 0.0,
+            "Y": 1.0,
+            "Z": 0.0
+          }
+        }
+        """);
+
+        return worldGeometryPath;
     }
 }
