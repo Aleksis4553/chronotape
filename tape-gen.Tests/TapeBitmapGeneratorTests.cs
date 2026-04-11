@@ -116,7 +116,7 @@ public sealed class TapeBitmapGeneratorTests
     {
         var spec = new TapeSpec
         {
-            SegmentCharacters = " ",
+            SegmentCharacters = "1",
             MainCharacters = "1",
             Offset = 0,
             SlitCount = 1,
