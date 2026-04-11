@@ -13,6 +13,16 @@ internal static class TapeGenerationCliParser
 {
     private const string GenerateFlag = "--generate-tape";
     private const string SampleFlag = "--sample-tape";
+    private const double DefaultDpi = 100d;
+    private const double DefaultSegmentWidthMm = 35.56d;
+    private const double DefaultSegmentHeightMm = 53.34d;
+    private const double DefaultTopMarginMm = 7.62d;
+    private const double DefaultMainPaddingMm = 2.032d;
+    private const double DefaultDeadzonePaddingMm = 0.508d;
+    private const double DefaultDeadzoneLeftMm = 13.208d;
+    private const double DefaultDeadzoneTopMm = 37.592d;
+    private const double DefaultDeadzoneRightMm = 22.352d;
+    private const double DefaultDeadzoneBottomMm = 46.736d;
     private static readonly HashSet<string> SupportedArguments =
     [
         GenerateFlag,
@@ -22,25 +32,6 @@ internal static class TapeGenerationCliParser
         "--main-characters",
         "--offset",
         "--slit-count",
-        "--segment-width",
-        "--segment-width-mm",
-        "--segment-height",
-        "--segment-height-mm",
-        "--top-margin",
-        "--top-margin-mm",
-        "--deadzone-left",
-        "--deadzone-left-mm",
-        "--deadzone-top",
-        "--deadzone-top-mm",
-        "--deadzone-right",
-        "--deadzone-right-mm",
-        "--deadzone-bottom",
-        "--deadzone-bottom-mm",
-        "--main-padding",
-        "--main-padding-mm",
-        "--deadzone-padding",
-        "--deadzone-padding-mm",
-        "--dpi",
         "--font",
         "--font-family",
         "--debug-rects",
@@ -118,22 +109,16 @@ internal static class TapeGenerationCliParser
             return ErrorResult(slitCountError!);
         }
 
-        if (!TryResolveDpi(argsMap, environmentReader, config.Dpi, out double? dpi, out string? dpiError))
+        double dpi = config.Dpi ?? DefaultDpi;
+        if (!IsFiniteAndPositive(dpi))
         {
-            return ErrorResult(dpiError!);
+            return ErrorResult("Dpi in --tape-config must be > 0.");
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--segment-width",
-            "CHRONOTAPE_SEGMENT_WIDTH",
-            config.SegmentWidthPx,
-            "--segment-width-mm",
-            "CHRONOTAPE_SEGMENT_WIDTH_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.SegmentWidthMm,
             "SegmentWidthMm",
-            defaultValue: 140,
+            defaultValueMm: DefaultSegmentWidthMm,
             dpi,
             out int segmentWidthPx,
             out string? segmentWidthError))
@@ -141,17 +126,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(segmentWidthError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--segment-height",
-            "CHRONOTAPE_SEGMENT_HEIGHT",
-            config.SegmentHeightPx,
-            "--segment-height-mm",
-            "CHRONOTAPE_SEGMENT_HEIGHT_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.SegmentHeightMm,
             "SegmentHeightMm",
-            defaultValue: 210,
+            defaultValueMm: DefaultSegmentHeightMm,
             dpi,
             out int segmentHeightPx,
             out string? segmentHeightError))
@@ -159,17 +137,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(segmentHeightError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--top-margin",
-            "CHRONOTAPE_TOP_MARGIN",
-            config.TopMarginPx,
-            "--top-margin-mm",
-            "CHRONOTAPE_TOP_MARGIN_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.TopMarginMm,
             "TopMarginMm",
-            defaultValue: 30,
+            defaultValueMm: DefaultTopMarginMm,
             dpi,
             out int topMarginPx,
             out string? topMarginError))
@@ -177,17 +148,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(topMarginError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--main-padding",
-            "CHRONOTAPE_MAIN_PADDING",
-            config.MainPaddingPx,
-            "--main-padding-mm",
-            "CHRONOTAPE_MAIN_PADDING_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.MainPaddingMm,
             "MainPaddingMm",
-            defaultValue: 8,
+            defaultValueMm: DefaultMainPaddingMm,
             dpi,
             out int mainPaddingPx,
             out string? mainPaddingError))
@@ -195,17 +159,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(mainPaddingError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--deadzone-padding",
-            "CHRONOTAPE_DEADZONE_PADDING",
-            config.DeadzonePaddingPx,
-            "--deadzone-padding-mm",
-            "CHRONOTAPE_DEADZONE_PADDING_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.DeadzonePaddingMm,
             "DeadzonePaddingMm",
-            defaultValue: 2,
+            defaultValueMm: DefaultDeadzonePaddingMm,
             dpi,
             out int deadzonePaddingPx,
             out string? deadzonePaddingError))
@@ -213,17 +170,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(deadzonePaddingError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--deadzone-left",
-            "CHRONOTAPE_DEADZONE_LEFT",
-            config.DeadzoneRectPx?.Left,
-            "--deadzone-left-mm",
-            "CHRONOTAPE_DEADZONE_LEFT_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.DeadzoneRectMm?.Left,
             "DeadzoneRectMm.Left",
-            defaultValue: 52,
+            defaultValueMm: DefaultDeadzoneLeftMm,
             dpi,
             out int deadzoneLeft,
             out string? deadzoneLeftError))
@@ -231,17 +181,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(deadzoneLeftError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--deadzone-top",
-            "CHRONOTAPE_DEADZONE_TOP",
-            config.DeadzoneRectPx?.Top,
-            "--deadzone-top-mm",
-            "CHRONOTAPE_DEADZONE_TOP_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.DeadzoneRectMm?.Top,
             "DeadzoneRectMm.Top",
-            defaultValue: 148,
+            defaultValueMm: DefaultDeadzoneTopMm,
             dpi,
             out int deadzoneTop,
             out string? deadzoneTopError))
@@ -249,17 +192,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(deadzoneTopError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--deadzone-right",
-            "CHRONOTAPE_DEADZONE_RIGHT",
-            config.DeadzoneRectPx?.Right,
-            "--deadzone-right-mm",
-            "CHRONOTAPE_DEADZONE_RIGHT_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.DeadzoneRectMm?.Right,
             "DeadzoneRectMm.Right",
-            defaultValue: 88,
+            defaultValueMm: DefaultDeadzoneRightMm,
             dpi,
             out int deadzoneRight,
             out string? deadzoneRightError))
@@ -267,17 +203,10 @@ internal static class TapeGenerationCliParser
             return ErrorResult(deadzoneRightError!);
         }
 
-        if (!TryResolveDimensionPx(
-            argsMap,
-            environmentReader,
-            "--deadzone-bottom",
-            "CHRONOTAPE_DEADZONE_BOTTOM",
-            config.DeadzoneRectPx?.Bottom,
-            "--deadzone-bottom-mm",
-            "CHRONOTAPE_DEADZONE_BOTTOM_MM",
+        if (!TryResolveDimensionPxFromConfig(
             config.DeadzoneRectMm?.Bottom,
             "DeadzoneRectMm.Bottom",
-            defaultValue: 184,
+            defaultValueMm: DefaultDeadzoneBottomMm,
             dpi,
             out int deadzoneBottom,
             out string? deadzoneBottomError))
@@ -423,135 +352,19 @@ internal static class TapeGenerationCliParser
         return true;
     }
 
-    private static bool TryResolveDpi(
-        IReadOnlyDictionary<string, string> argsMap,
-        Func<string, string?> environmentReader,
-        double? configDpi,
-        out double? value,
-        out string? error)
-    {
-        string? raw = FirstNonEmpty(GetArg(argsMap, "--dpi"), environmentReader("CHRONOTAPE_DPI"));
-        if (raw is not null)
-        {
-            if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed))
-            {
-                value = null;
-                error = $"Invalid number for --dpi / CHRONOTAPE_DPI: '{raw}'.";
-                return false;
-            }
-
-            if (!IsFiniteAndPositive(parsed))
-            {
-                value = null;
-                error = "--dpi / CHRONOTAPE_DPI must be > 0.";
-                return false;
-            }
-
-            value = parsed;
-            error = null;
-            return true;
-        }
-
-        if (configDpi.HasValue)
-        {
-            if (!IsFiniteAndPositive(configDpi.Value))
-            {
-                value = null;
-                error = "Dpi in --tape-config must be > 0.";
-                return false;
-            }
-
-            value = configDpi.Value;
-            error = null;
-            return true;
-        }
-
-        value = null;
-        error = null;
-        return true;
-    }
-
-    private static bool TryResolveDimensionPx(
-        IReadOnlyDictionary<string, string> argsMap,
-        Func<string, string?> environmentReader,
-        string pxArgumentName,
-        string pxEnvironmentName,
-        int? configPxValue,
-        string mmArgumentName,
-        string mmEnvironmentName,
-        double? configMmValue,
-        string configMmLabel,
-        int defaultValue,
-        double? dpi,
+    private static bool TryResolveDimensionPxFromConfig(
+        double? configuredMillimeters,
+        string mmName,
+        double defaultValueMm,
+        double dpi,
         out int value,
         out string? error)
     {
-        string? cliMm = GetArg(argsMap, mmArgumentName);
-        if (!string.IsNullOrWhiteSpace(cliMm))
-        {
-            return TryConvertMillimetersToPixels(cliMm, mmArgumentName, dpi, out value, out error);
-        }
-
-        string? cliPx = GetArg(argsMap, pxArgumentName);
-        if (!string.IsNullOrWhiteSpace(cliPx))
-        {
-            return TryParseInteger(cliPx, $"{pxArgumentName} / {pxEnvironmentName}", out value, out error);
-        }
-
-        string? envMm = environmentReader(mmEnvironmentName);
-        if (!string.IsNullOrWhiteSpace(envMm))
-        {
-            return TryConvertMillimetersToPixels(envMm, mmEnvironmentName, dpi, out value, out error);
-        }
-
-        string? envPx = environmentReader(pxEnvironmentName);
-        if (!string.IsNullOrWhiteSpace(envPx))
-        {
-            return TryParseInteger(envPx, $"{pxArgumentName} / {pxEnvironmentName}", out value, out error);
-        }
-
-        if (configMmValue.HasValue)
-        {
-            return TryConvertMillimetersToPixels(configMmValue.Value, configMmLabel, dpi, out value, out error);
-        }
-
-        if (configPxValue.HasValue)
-        {
-            value = configPxValue.Value;
-            error = null;
-            return true;
-        }
-
-        value = defaultValue;
-        error = null;
-        return true;
+        double millimeters = configuredMillimeters ?? defaultValueMm;
+        return TryConvertMillimetersToPixels(millimeters, mmName, dpi, out value, out error);
     }
 
-    private static bool TryParseInteger(string raw, string name, out int value, out string? error)
-    {
-        if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out value))
-        {
-            error = null;
-            return true;
-        }
-
-        error = $"Invalid integer for {name}: '{raw}'.";
-        return false;
-    }
-
-    private static bool TryConvertMillimetersToPixels(string rawMm, string mmName, double? dpi, out int value, out string? error)
-    {
-        if (!double.TryParse(rawMm, NumberStyles.Float, CultureInfo.InvariantCulture, out double mm))
-        {
-            value = 0;
-            error = $"Invalid millimeter value for {mmName}: '{rawMm}'.";
-            return false;
-        }
-
-        return TryConvertMillimetersToPixels(mm, mmName, dpi, out value, out error);
-    }
-
-    private static bool TryConvertMillimetersToPixels(double millimeters, string mmName, double? dpi, out int value, out string? error)
+    private static bool TryConvertMillimetersToPixels(double millimeters, string mmName, double dpi, out int value, out string? error)
     {
         if (!double.IsFinite(millimeters))
         {
@@ -560,16 +373,16 @@ internal static class TapeGenerationCliParser
             return false;
         }
 
-        if (!dpi.HasValue)
+        if (!IsFiniteAndPositive(dpi))
         {
             value = 0;
-            error = $"{mmName} requires DPI. Provide --dpi, CHRONOTAPE_DPI, or Dpi in --tape-config.";
+            error = "Dpi in --tape-config must be > 0.";
             return false;
         }
 
         try
         {
-            value = checked((int)Math.Round((millimeters * dpi.Value) / 25.4d, MidpointRounding.AwayFromZero));
+            value = checked((int)Math.Round((millimeters * dpi) / 25.4d, MidpointRounding.AwayFromZero));
             error = null;
             return true;
         }
@@ -645,32 +458,18 @@ internal sealed class TapeConfigFile
     public string? MainCharacters { get; set; }
     public int? Offset { get; set; }
     public int? SlitCount { get; set; }
-    public int? SegmentWidthPx { get; set; }
     public double? SegmentWidthMm { get; set; }
-    public int? SegmentHeightPx { get; set; }
     public double? SegmentHeightMm { get; set; }
-    public int? TopMarginPx { get; set; }
     public double? TopMarginMm { get; set; }
-    public TapeRectConfig? DeadzoneRectPx { get; set; }
     public TapeRectMmConfig? DeadzoneRectMm { get; set; }
     public string? FontPath { get; set; }
     public string? FontFamily { get; set; }
-    public int? MainPaddingPx { get; set; }
     public double? MainPaddingMm { get; set; }
-    public int? DeadzonePaddingPx { get; set; }
     public double? DeadzonePaddingMm { get; set; }
     public double? Dpi { get; set; }
     public string? OutputPath { get; set; }
     public bool? DebugDrawRects { get; set; }
     public bool? DebugHighlightRects { get; set; }
-}
-
-internal sealed class TapeRectConfig
-{
-    public int? Left { get; set; }
-    public int? Top { get; set; }
-    public int? Right { get; set; }
-    public int? Bottom { get; set; }
 }
 
 internal sealed class TapeRectMmConfig

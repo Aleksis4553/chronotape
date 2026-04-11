@@ -86,14 +86,14 @@ internal static class TapeBitmapGenerator
             int deadzoneIndex = (i + spec.Offset) % segmentCount;
             char deadzoneChar = spec.SegmentCharacters[deadzoneIndex];
             SKRectI absoluteDeadzoneRect = OffsetRect(spec.DeadzoneRectPx, segmentRect.Left, segmentRect.Top);
-            SKRectI deadzoneInnerRect = InsetRectOrThrow(absoluteDeadzoneRect, spec.DeadzonePaddingPx, "deadzone glyph");
+            SKRectI deadzoneClipRect = InsetRectOrThrow(absoluteDeadzoneRect, spec.DeadzonePaddingPx, "deadzone glyph");
             if (useFontFile)
             {
-                DrawProjectedDeadzoneGlyphUsingPipeline(bitmap, deadzoneChar, mainRect, deadzoneInnerRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount);
+                DrawProjectedDeadzoneGlyphUsingPipeline(bitmap, deadzoneChar, mainRect, absoluteDeadzoneRect, deadzoneClipRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount);
             }
             else
             {
-                DrawProjectedDeadzoneGlyphLegacy(bitmap, deadzoneChar, mainRect, deadzoneInnerRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount);
+                DrawProjectedDeadzoneGlyphLegacy(bitmap, deadzoneChar, mainRect, absoluteDeadzoneRect, deadzoneClipRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount);
             }
 
             if (spec.DebugDrawRects)
@@ -240,7 +240,8 @@ internal static class TapeBitmapGenerator
         SKBitmap tapeBitmap,
         char glyph,
         SKRectI sourceRect,
-        SKRectI deadzoneRect,
+        SKRectI deadzoneApertureRect,
+        SKRectI deadzoneClipRect,
         SKTypeface typeface,
         SKColor color,
         int slitIndex,
@@ -251,7 +252,7 @@ internal static class TapeBitmapGenerator
         float sourceWidth = sourceMask.Width;
         float sourceHeight = sourceMask.Height;
 
-        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneRect.Width / sourceWidth, deadzoneRect.Height / sourceHeight);
+        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / sourceWidth, deadzoneApertureRect.Height / sourceHeight);
         if (desiredScale <= 0f)
         {
             throw new InvalidOperationException("Deadzone projection scale is invalid.");
@@ -269,8 +270,8 @@ internal static class TapeBitmapGenerator
         Vector3 displayUp = new(0f, MathF.Cos(tiltRadians), MathF.Sin(tiltRadians));
         Vector3 light = new(0f, 0f, -ProjectionLightDistance);
         float slitPosition = slitCount == 1 ? 0f : ((float)slitIndex / (slitCount - 1)) - 0.5f;
-        float projectedOriginX = deadzoneRect.MidX + (deadzoneRect.Width * ProjectionBaseOffsetXRatio) + (deadzoneRect.Width * ProjectionSlitSpreadXRatio * slitPosition);
-        float projectedOriginY = deadzoneRect.MidY - (deadzoneRect.Height * ProjectionBaseOffsetYRatio);
+        float projectedOriginX = deadzoneApertureRect.MidX + (deadzoneApertureRect.Width * ProjectionBaseOffsetXRatio) + (deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition);
+        float projectedOriginY = deadzoneApertureRect.MidY - (deadzoneApertureRect.Height * ProjectionBaseOffsetYRatio);
 
         for (int y = 0; y < sourceMask.Height; y++)
         {
@@ -299,10 +300,10 @@ internal static class TapeBitmapGenerator
                 int targetX = (int)MathF.Round(projectedOriginX + projectedX);
                 int targetY = (int)MathF.Round(projectedOriginY - projectedY);
 
-                if (targetX < deadzoneRect.Left
-                    || targetX >= deadzoneRect.Right
-                    || targetY < deadzoneRect.Top
-                    || targetY >= deadzoneRect.Bottom)
+                if (targetX < deadzoneClipRect.Left
+                    || targetX >= deadzoneClipRect.Right
+                    || targetY < deadzoneClipRect.Top
+                    || targetY >= deadzoneClipRect.Bottom)
                 {
                     continue;
                 }
@@ -316,7 +317,8 @@ internal static class TapeBitmapGenerator
         SKBitmap tapeBitmap,
         char glyph,
         SKRectI sourceRect,
-        SKRectI deadzoneRect,
+        SKRectI deadzoneApertureRect,
+        SKRectI deadzoneClipRect,
         SKTypeface typeface,
         SKColor color,
         int slitIndex,
@@ -329,7 +331,7 @@ internal static class TapeBitmapGenerator
             return;
         }
 
-        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneRect.Width / (float)sourceMask.Width, deadzoneRect.Height / (float)sourceMask.Height);
+        float desiredScale = DeadzoneScaleFactor * MathF.Min(deadzoneApertureRect.Width / (float)sourceMask.Width, deadzoneApertureRect.Height / (float)sourceMask.Height);
         if (desiredScale <= 0f)
         {
             throw new InvalidOperationException("Deadzone projection scale is invalid.");
@@ -348,13 +350,13 @@ internal static class TapeBitmapGenerator
         Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceMask.Width, sourceMask.Height);
 
         double slitPosition = slitCount == 1 ? 0.0 : ((double)slitIndex / (slitCount - 1)) - 0.5;
-        double slitOffsetX = deadzoneRect.Width * ProjectionSlitSpreadXRatio * slitPosition;
+        double slitOffsetX = deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition;
         Frame slitFrame = new(
             new Point3D(slitOffsetX, 0, 0),
             new Vector3D(0, 0, 1),
             new Vector3D(0, 1, 0),
-            deadzoneRect.Width,
-            deadzoneRect.Height);
+            deadzoneApertureRect.Width,
+            deadzoneApertureRect.Height);
 
         SlitProjectionResult projection = ProjectionPipeline.ProjectSingleSlit(
             slitIndex,
@@ -363,7 +365,7 @@ internal static class TapeBitmapGenerator
             slitFrame,
             new Point3D(0, 0, -ProjectionLightDistance));
 
-        bool[][] projectedBitmap = ProjectionPipeline.BuildSlitLocalBitmap(deadzoneRect.Width, deadzoneRect.Height, slitFrame, projection.Points);
+        bool[][] projectedBitmap = ProjectionPipeline.BuildSlitLocalBitmap(deadzoneApertureRect.Width, deadzoneApertureRect.Height, slitFrame, projection.Points);
         for (int y = 0; y < projectedBitmap.Length; y++)
         {
             for (int x = 0; x < projectedBitmap[y].Length; x++)
@@ -373,7 +375,17 @@ internal static class TapeBitmapGenerator
                     continue;
                 }
 
-                tapeBitmap.SetPixel(deadzoneRect.Left + x, deadzoneRect.Top + y, color);
+                int targetX = deadzoneApertureRect.Left + x;
+                int targetY = deadzoneApertureRect.Top + y;
+                if (targetX < deadzoneClipRect.Left
+                    || targetX >= deadzoneClipRect.Right
+                    || targetY < deadzoneClipRect.Top
+                    || targetY >= deadzoneClipRect.Bottom)
+                {
+                    continue;
+                }
+
+                tapeBitmap.SetPixel(targetX, targetY, color);
             }
         }
     }
