@@ -1,15 +1,15 @@
 {
-    "SegmentCharacters": "123",
-    "MainCharacters": "123",
+    "SegmentCharacters": "12345",
+    "MainCharacters": "12345",
     "Offset": 1,
-    "Dpi": 100,
+    "Dpi": 500,
     "OutputPath": "./tapes/tape.png",
-    "SegmentWidthMm": 38.1,
-    "SegmentHeightMm": 76.2,
-    "TopMarginMm": 12.7,
-    "MainHorizontalPaddingMm": 0.0,
+    "SegmentWidthMm": 50,
+    "SegmentHeightMm": 100,
+    "TopMarginMm": 5,
+    "MainHorizontalPaddingMm": 2,
     "MainVerticalPaddingMm": 0.0,
-    "DeadzoneHorizontalPaddingMm": 0.508,
-    "DeadzoneVerticalPaddingMm": 0.508,
-    "SlitCenterYOffsetMm": 21.844
+    "DeadzoneHorizontalPaddingMm": 0,
+    "DeadzoneVerticalPaddingMm": 0,
+    "SlitCenterYOffsetMm": 26.5
 }

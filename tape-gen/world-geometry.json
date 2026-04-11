@@ -1,10 +1,10 @@
 {
-    "SlitWidthMm": 17.78,
-    "SlitHeightMm": 17.272,
+    "SlitWidthMm": 14,
+    "SlitHeightMm": 20,
     "SlitCount": 4,
-    "SlitSegmentCenterDistanceMm": 50.0,
-    "TapeTopHeightFromGroundMm": 0.0,
-    "DisplayedSegmentWidthMm": 150.0,
+    "SlitSegmentCenterDistanceMm": 60.0,
+    "TapeTopHeightFromGroundMm": 130,
+    "DisplayedSegmentWidthMm": 180.0,
     "DisplayedSegmentHeightMm": 300.0,
     "DisplayedSegmentCenterDistanceMm": 160.0,
     "TapeOriginMm": {
