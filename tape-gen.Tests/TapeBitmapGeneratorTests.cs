@@ -3,6 +3,10 @@ using Xunit;
 
 public sealed class TapeBitmapGeneratorTests
 {
+    private const byte MaxGreenForMagenta = 30;
+    private const byte MinRedOrBlueForMagenta = 40;
+    private const byte MaxRedOrBlueForMagenta = 200;
+
     [Fact]
     public void GenerateTapeBitmap_UsesDeadzoneApertureForProjectionAndAppliesPaddingAsClip()
     {
@@ -143,8 +147,11 @@ public sealed class TapeBitmapGeneratorTests
             for (int x = 0; x < bitmap.Width; x++)
             {
                 SKColor color = bitmap.GetPixel(x, y);
-                bool isMagentaFill = color.Green < 30 && color.Red > 40 && color.Red < 200 && color.Blue > 40 && color.Blue < 200;
-                bool isMagentaLike = isMagentaFill;
+                bool isMagentaLike = color.Green < MaxGreenForMagenta
+                    && color.Red > MinRedOrBlueForMagenta
+                    && color.Red < MaxRedOrBlueForMagenta
+                    && color.Blue > MinRedOrBlueForMagenta
+                    && color.Blue < MaxRedOrBlueForMagenta;
                 if (!isMagentaLike)
                 {
                     continue;

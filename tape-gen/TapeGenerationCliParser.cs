@@ -219,7 +219,11 @@ internal static class TapeGenerationCliParser
 
         int legacySlitWidthPx = deadzoneRight - deadzoneLeft;
         int legacySlitHeightPx = deadzoneBottom - deadzoneTop;
-        int legacySlitCenterYOffsetPx = ((deadzoneTop + deadzoneBottom) - segmentHeightPx) / 2;
+        double legacyDeadzoneCenterYPx = (deadzoneTop + deadzoneBottom) / 2d;
+        double legacySegmentCenterYPx = segmentHeightPx / 2d;
+        int legacySlitCenterYOffsetPx = (int)Math.Round(
+            legacyDeadzoneCenterYPx - legacySegmentCenterYPx,
+            MidpointRounding.AwayFromZero);
 
         if (!TryResolveDimensionPxFromConfig(
             config.SlitWidthMm,
