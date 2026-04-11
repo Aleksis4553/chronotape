@@ -19,7 +19,7 @@ const int SLIT_AMOUNT = 4;
 const double TAPE_TOP_HEIGHT_FROM_GROUND = 0;
 
 // Example:
-// dotnet run --project /home/runner/work/chronotape/chronotape/tape-gen/tape-gen.csproj -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "12:34" --fontSize 200 --sampleStep 2 --out /tmp/chronotape-projection --slitIndex 0
+// dotnet run --project ./tape-gen/tape-gen.csproj -- --font /absolute/path/to/font.ttf --text "12:34" --fontSize 200 --sampleStep 2 --out ./projection-out --slitIndex 0
 
 ProjectionOptions? options = ParseProjectionOptions(args);
 
@@ -327,7 +327,7 @@ static ProjectionOptions? ParseProjectionOptions(string[] cliArgs)
 static void PrintUsage()
 {
     Console.WriteLine("Usage:");
-    Console.WriteLine("  dotnet run --project /home/runner/work/chronotape/chronotape/tape-gen/tape-gen.csproj -- \\");
+    Console.WriteLine("  dotnet run --project ./tape-gen/tape-gen.csproj -- \\");
     Console.WriteLine("    --font /absolute/path/to/font.ttf --text \"12:34\" --fontSize 200 --sampleStep 2 --out ./projection-out [--slitIndex 0] [--sampleMode fill|edge]");
 }
 
