@@ -163,7 +163,7 @@ public sealed class TapeBitmapGeneratorTests
     }
 
     [Fact]
-    public void CropToOpaqueBounds_WhenCropVerticalFalse_KeepsFullHeight()
+    public void CropToOpaqueBounds_WhenFixedYBoundsProvided_UsesThoseYBoundsAndCropsXTight()
     {
         using var bitmap = new SKBitmap(10, 10, SKColorType.Bgra8888, SKAlphaType.Premul);
         bitmap.Erase(SKColors.Transparent);
@@ -175,9 +175,10 @@ public sealed class TapeBitmapGeneratorTests
             }
         }
 
-        using SKBitmap cropped = TapeBitmapGenerator.CropToOpaqueBounds(bitmap, "test", cropVertical: false);
-        Assert.Equal(3, cropped.Width);
-        Assert.Equal(10, cropped.Height);
+        // Fix Y to rows 2-8 (wider than the natural glyph rows 4-6); X should still be tight.
+        using SKBitmap cropped = TapeBitmapGenerator.CropToOpaqueBounds(bitmap, "test", fixedMinY: 2, fixedMaxY: 8);
+        Assert.Equal(3, cropped.Width);  // X still cropped tight to cols 4-6
+        Assert.Equal(7, cropped.Height); // Y fixed: rows 2-8 inclusive
     }
 
     private static SKRectI BuildApertureRect(TapeSpec spec)
