@@ -183,12 +183,14 @@ bool[][] BuildBitmap(int width, int height, List<ProjectedPoint> points)
 
     foreach (ProjectedPoint point in points)
     {
-        if (point.PixelY < 0 || point.PixelY >= height || point.PixelX < 0 || point.PixelX >= width)
+        int pixelX = point.PixelX;
+        int pixelY = point.PixelY;
+        if (pixelY < 0 || pixelY >= height || pixelX < 0 || pixelX >= width)
         {
             continue;
         }
 
-        bitmap[point.PixelY][point.PixelX] = true;
+        bitmap[pixelY][pixelX] = true;
     }
 
     return bitmap;
