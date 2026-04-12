@@ -151,7 +151,7 @@ for (int charIndex = 0; charIndex < mainCharacterBitmaps.Count; charIndex++)
 }
 
 GeneratePhysicalTapes(allMainMasks, allGeneratedTapeMasks, slits.Count, Config.Paths.TapeOutput,
-debug: false);
+debug: Config.Tape.Debug);
 
 GenerateVerificationGrid(allGeneratedTapeMasks, deadzoneBaseCharacterBitmaps, slits, displayedSegments, lightSources, Path.Combine(projectedDir, "verification-grid.png"));
 

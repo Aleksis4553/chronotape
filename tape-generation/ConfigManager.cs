@@ -30,6 +30,7 @@ namespace Configuration
         public double MainHorizontalPaddingMm { get; set; }
         public double MainVerticalPaddingMm { get; set; }
         public double SlitCenterYOffsetMm { get; set; }
+        public bool Debug { get; set; }
     }
 
     public class WorldGeometryConfig

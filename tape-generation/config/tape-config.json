@@ -4,11 +4,12 @@
     "Offset": 1,
     "Dpi": 200,
     "MainGlyphFontSizeMm": 90,
-    "DeadGlyphFontSizeMm": 300,
+    "DeadGlyphFontSizeMm": 200,
     "SegmentWidthMm": 50,
     "SegmentHeightMm": 100,
     "TopMarginMm": 5,
     "MainHorizontalPaddingMm": 2,
     "MainVerticalPaddingMm": 0.0,
-    "SlitCenterYOffsetMm": 25
+    "SlitCenterYOffsetMm": 25,
+    "Debug": false
 }
