@@ -68,7 +68,8 @@ internal static class ProjectionPipeline
         IReadOnlyList<SampledPixel> sampledPixels,
         Frame slit,
         Frame display,
-        Point3D lightSource)
+        Point3D lightSource,
+        double pixelSizeMm)
     {
         Plane displayPlane = new Plane(FrameMath.GetFrameNormal(display), display.Center);
 
@@ -81,8 +82,8 @@ internal static class ProjectionPipeline
         var projectedPoints = new List<ProjectedPoint>();
         foreach (SampledPixel pixel in sampledPixels)
         {
-            double u = pixel.X;
-            double v = -pixel.Y;
+            double u = pixel.X * pixelSizeMm;
+            double v = -pixel.Y * pixelSizeMm;
             Point3D slitPoint = FrameMath.OffsetPoint(slit.Center, slitRight, u, slitUp, v);
 
             if (!GeometryMath.GetProjectionPoint(lightSource, slitPoint, displayPlane, out Point3D intersection))
