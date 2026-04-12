@@ -275,7 +275,8 @@ internal static class TapeGenerationCliParser
             MainPaddingYPx = mainPaddingYPx,
             OutputPath = outputPath,
             DebugDrawRects = debugRects,
-            DebugHighlightRects = highlightRects
+            DebugHighlightRects = highlightRects,
+            WorldGeometry = worldGeometry!
         };
 
         return new TapeGenerationParseResult
