@@ -51,6 +51,8 @@ internal sealed class ProjectedPoint
 {
     public int PixelX { get; set; }
     public int PixelY { get; set; }
+    public double DisplayLocalX { get; set; }
+    public double DisplayLocalY { get; set; }
     public double DisplayWorldX { get; set; }
     public double DisplayWorldY { get; set; }
     public double DisplayWorldZ { get; set; }

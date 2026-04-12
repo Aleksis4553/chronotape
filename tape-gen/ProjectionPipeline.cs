@@ -41,6 +41,8 @@ internal static class ProjectionPipeline
             {
                 PixelX = pixel.X,
                 PixelY = pixel.Y,
+                DisplayLocalX = u,
+                DisplayLocalY = v,
                 DisplayWorldX = displayPoint.X,
                 DisplayWorldY = displayPoint.Y,
                 DisplayWorldZ = displayPoint.Z,
@@ -49,6 +51,65 @@ internal static class ProjectionPipeline
                 WorldZ = intersection.Z,
                 SlitLocalX = localX,
                 SlitLocalY = localY
+            });
+        }
+
+        return new SlitProjectionResult
+        {
+            SlitIndex = slitIndex,
+            LightSource = lightSource,
+            SampleCount = projectedPoints.Count,
+            Points = projectedPoints
+        };
+    }
+
+    public static SlitProjectionResult ProjectThroughSlitGlyphToDisplay(
+        int slitIndex,
+        IReadOnlyList<SampledPixel> sampledPixels,
+        Frame slit,
+        Frame display,
+        Point3D lightSource)
+    {
+        Plane displayPlane = new Plane(FrameMath.GetFrameNormal(display), display.Center);
+
+        Vector3D slitRight = FrameMath.GetFrameRight(slit);
+        Vector3D slitUp = FrameMath.GetFrameUp(slit);
+        double slitWidth = FrameMath.GetFrameWidth(slit);
+        double slitHeight = FrameMath.GetFrameHeight(slit);
+
+        Vector3D displayRight = FrameMath.GetFrameRight(display);
+        Vector3D displayUp = FrameMath.GetFrameUp(display);
+
+        var projectedPoints = new List<ProjectedPoint>();
+        foreach (SampledPixel pixel in sampledPixels)
+        {
+            double u = (((pixel.X + 0.5) / pixel.BitmapWidth) - 0.5) * slitWidth;
+            double v = (0.5 - ((pixel.Y + 0.5) / pixel.BitmapHeight)) * slitHeight;
+            Point3D slitPoint = FrameMath.OffsetPoint(slit.Center, slitRight, u, slitUp, v);
+
+            if (!GeometryMath.GetProjectionPoint(lightSource, slitPoint, displayPlane, out Point3D intersection))
+            {
+                continue;
+            }
+
+            Vector3D centerToIntersection = new Vector3D(display.Center, intersection);
+            double displayLocalX = Vector3D.Dot(centerToIntersection, displayRight);
+            double displayLocalY = Vector3D.Dot(centerToIntersection, displayUp);
+
+            projectedPoints.Add(new ProjectedPoint
+            {
+                PixelX = pixel.X,
+                PixelY = pixel.Y,
+                DisplayLocalX = displayLocalX,
+                DisplayLocalY = displayLocalY,
+                DisplayWorldX = intersection.X,
+                DisplayWorldY = intersection.Y,
+                DisplayWorldZ = intersection.Z,
+                WorldX = slitPoint.X,
+                WorldY = slitPoint.Y,
+                WorldZ = slitPoint.Z,
+                SlitLocalX = u,
+                SlitLocalY = v
             });
         }
 

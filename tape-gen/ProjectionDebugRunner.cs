@@ -3,6 +3,9 @@ using SkiaSharp;
 
 internal static class ProjectionDebugRunner
 {
+    private const int CellPaddingPx = 12;
+    private const int RowSeparatorThicknessPx = 2;
+
     public static void Run(ProjectionOptions options)
     {
         Directory.CreateDirectory(options.OutPath);
@@ -39,23 +42,9 @@ internal static class ProjectionDebugRunner
             {
                 continue;
             }
-
-            string slitDir = Path.Combine(projectedDir, $"slit-{slitIndex}");
-            Directory.CreateDirectory(slitDir);
-            for (int charIndex = 0; charIndex < characterBitmaps.Count; charIndex++)
-            {
-                CharacterBitmapSample sample = characterBitmaps[charIndex];
-                SlitProjectionResult result = ProjectionPipeline.ProjectSingleSlit(
-                    slitIndex,
-                    sample.Pixels,
-                    displayedSegments[slitIndex],
-                    slits[slitIndex],
-                    lightSources[slitIndex]!.Value);
-
-                bool[][] projectedBitmap = ProjectionPipeline.BuildSourceBitmap(sample.BitmapWidth, sample.BitmapHeight, result.Points);
-                SaveBoolBitmap(projectedBitmap, Path.Combine(slitDir, $"{charIndex:D2}-{Sanitize(sample.Character)}.png"));
-            }
         }
+
+        BuildVerificationGrid(projectedDir, characterBitmaps, slits, displayedSegments, lightSources);
     }
 
     private static List<Frame> BuildSlits(Point3D origin, Vector3D direction, Vector3D normal, Vector3D up, WorldGeometryConfig geometry)
@@ -154,6 +143,159 @@ internal static class ProjectionDebugRunner
 
         using SKImage skImage = SKImage.FromBitmap(image);
         using SKData data = skImage.Encode(SKEncodedImageFormat.Png, 100);
+        using FileStream stream = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        data.SaveTo(stream);
+    }
+
+    private static void BuildVerificationGrid(
+        string projectedDir,
+        List<CharacterBitmapSample> characterBitmaps,
+        List<Frame> slits,
+        List<Frame> displayedSegments,
+        Point3D?[] lightSources)
+    {
+        if (characterBitmaps.Count == 0 || slits.Count == 0)
+        {
+            return;
+        }
+
+        int cellWidth = characterBitmaps.Max(sample => sample.BitmapWidth);
+        int cellHeight = characterBitmaps.Max(sample => sample.BitmapHeight);
+        int columnCount = slits.Count;
+        int rowCount = characterBitmaps.Count;
+        int gridWidth = cellWidth * columnCount;
+        int totalSeparatorHeight = Math.Max(0, rowCount - 1) * RowSeparatorThicknessPx;
+        int gridHeight = (cellHeight * rowCount) + totalSeparatorHeight;
+
+        using var grid = new SKBitmap(gridWidth, gridHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using var gridCanvas = new SKCanvas(grid);
+        gridCanvas.Clear(SKColors.Black);
+
+        for (int glyphRow = 0; glyphRow < rowCount; glyphRow++)
+        {
+            CharacterBitmapSample glyph = characterBitmaps[glyphRow];
+            int rowTop = glyphRow * (cellHeight + RowSeparatorThicknessPx);
+
+            for (int slitColumn = 0; slitColumn < columnCount; slitColumn++)
+            {
+                int colLeft = slitColumn * cellWidth;
+                if (!lightSources[slitColumn].HasValue)
+                {
+                    DrawFrameBounds(grid, colLeft, rowTop, cellWidth, cellHeight, displayedSegments[slitColumn], new SKColor(64, 64, 64));
+                    continue;
+                }
+
+                SlitProjectionResult projection = ProjectionPipeline.ProjectThroughSlitGlyphToDisplay(
+                    slitColumn,
+                    glyph.Pixels,
+                    slits[slitColumn],
+                    displayedSegments[slitColumn],
+                    lightSources[slitColumn]!.Value);
+
+                DrawProjectedCell(grid, colLeft, rowTop, cellWidth, cellHeight, displayedSegments[slitColumn], projection.Points);
+            }
+
+            if (glyphRow < rowCount - 1)
+            {
+                int separatorStart = rowTop + cellHeight;
+                for (int y = separatorStart; y < separatorStart + RowSeparatorThicknessPx; y++)
+                {
+                    for (int x = 0; x < gridWidth; x++)
+                    {
+                        grid.SetPixel(x, y, new SKColor(96, 96, 96));
+                    }
+                }
+            }
+        }
+
+        SaveBitmap(grid, Path.Combine(projectedDir, "verification-grid.png"));
+    }
+
+    private static void DrawProjectedCell(
+        SKBitmap bitmap,
+        int cellLeft,
+        int cellTop,
+        int cellWidth,
+        int cellHeight,
+        Frame displayFrame,
+        IReadOnlyList<ProjectedPoint> points)
+    {
+        (int frameLeft, int frameTop, int frameWidth, int frameHeight) = ComputeDisplayFrameRect(cellLeft, cellTop, cellWidth, cellHeight, displayFrame);
+
+        double displayWidth = FrameMath.GetFrameWidth(displayFrame);
+        double displayHeight = FrameMath.GetFrameHeight(displayFrame);
+        if (displayWidth <= 0 || displayHeight <= 0)
+        {
+            return;
+        }
+
+        foreach (ProjectedPoint point in points)
+        {
+            double normalizedX = (point.DisplayLocalX + (displayWidth / 2.0)) / displayWidth;
+            double normalizedY = ((displayHeight / 2.0) - point.DisplayLocalY) / displayHeight;
+            int x = frameLeft + Math.Clamp((int)Math.Floor(normalizedX * frameWidth), 0, frameWidth - 1);
+            int y = frameTop + Math.Clamp((int)Math.Floor(normalizedY * frameHeight), 0, frameHeight - 1);
+            bitmap.SetPixel(x, y, SKColors.White);
+        }
+
+        DrawFrameBounds(bitmap, cellLeft, cellTop, cellWidth, cellHeight, displayFrame, SKColors.Lime);
+    }
+
+    private static void DrawFrameBounds(
+        SKBitmap bitmap,
+        int cellLeft,
+        int cellTop,
+        int cellWidth,
+        int cellHeight,
+        Frame displayFrame,
+        SKColor color)
+    {
+        (int frameLeft, int frameTop, int frameWidth, int frameHeight) = ComputeDisplayFrameRect(cellLeft, cellTop, cellWidth, cellHeight, displayFrame);
+        int frameRight = frameLeft + frameWidth - 1;
+        int frameBottom = frameTop + frameHeight - 1;
+
+        for (int x = frameLeft; x <= frameRight; x++)
+        {
+            bitmap.SetPixel(x, frameTop, color);
+            bitmap.SetPixel(x, frameBottom, color);
+        }
+
+        for (int y = frameTop; y <= frameBottom; y++)
+        {
+            bitmap.SetPixel(frameLeft, y, color);
+            bitmap.SetPixel(frameRight, y, color);
+        }
+    }
+
+    private static (int Left, int Top, int Width, int Height) ComputeDisplayFrameRect(
+        int cellLeft,
+        int cellTop,
+        int cellWidth,
+        int cellHeight,
+        Frame displayFrame)
+    {
+        double displayWidth = FrameMath.GetFrameWidth(displayFrame);
+        double displayHeight = FrameMath.GetFrameHeight(displayFrame);
+        if (displayWidth <= 0 || displayHeight <= 0)
+        {
+            return (cellLeft, cellTop, Math.Max(1, cellWidth), Math.Max(1, cellHeight));
+        }
+
+        int availableWidth = Math.Max(1, cellWidth - (CellPaddingPx * 2));
+        int availableHeight = Math.Max(1, cellHeight - (CellPaddingPx * 2));
+        double scale = Math.Min(availableWidth / displayWidth, availableHeight / displayHeight);
+
+        int frameWidth = Math.Clamp((int)Math.Round(displayWidth * scale), 1, availableWidth);
+        int frameHeight = Math.Clamp((int)Math.Round(displayHeight * scale), 1, availableHeight);
+        int frameLeft = cellLeft + ((cellWidth - frameWidth) / 2);
+        int frameTop = cellTop + ((cellHeight - frameHeight) / 2);
+        return (frameLeft, frameTop, frameWidth, frameHeight);
+    }
+
+    private static void SaveBitmap(SKBitmap bitmap, string path)
+    {
+        using SKImage image = SKImage.FromBitmap(bitmap);
+        using SKData data = image.Encode(SKEncodedImageFormat.Png, 100);
         using FileStream stream = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None);
         data.SaveTo(stream);
     }
