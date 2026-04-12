@@ -74,7 +74,8 @@ internal static class ProjectionPipeline
 
         Vector3D slitRight = FrameMath.GetFrameRight(slit);
         Vector3D slitUp = FrameMath.GetFrameUp(slit);
-        const double unitPerPixel = 1.0;
+        double slitWidth = FrameMath.GetFrameWidth(slit);
+        double slitHeight = FrameMath.GetFrameHeight(slit);
 
         Vector3D displayRight = FrameMath.GetFrameRight(display);
         Vector3D displayUp = FrameMath.GetFrameUp(display);
@@ -82,8 +83,16 @@ internal static class ProjectionPipeline
         var projectedPoints = new List<ProjectedPoint>();
         foreach (SampledPixel pixel in sampledPixels)
         {
+            if (pixel.BitmapWidth <= 0 || pixel.BitmapHeight <= 0)
+            {
+                continue;
+            }
+
             double dx = (pixel.X + 0.5) - (pixel.BitmapWidth / 2.0);
             double dy = (pixel.BitmapHeight / 2.0) - (pixel.Y + 0.5);
+            double scaleX = slitWidth / pixel.BitmapWidth;
+            double scaleY = slitHeight / pixel.BitmapHeight;
+            double unitPerPixel = Math.Min(scaleX, scaleY);
             double u = dx * unitPerPixel;
             double v = dy * unitPerPixel;
             Point3D slitPoint = FrameMath.OffsetPoint(slit.Center, slitRight, u, slitUp, v);
