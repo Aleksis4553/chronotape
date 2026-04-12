@@ -147,7 +147,7 @@ dotnet run --project ./tape-gen/tape-gen.csproj -- \
 This writes intermediate artifacts such as:
 
 - `./projection-debug/rendered/*.png` (sampled rendered glyph bitmaps)
-- `./projection-debug/projected/slit-*/*.png` (projected glyph bitmaps per slit)
+- `./projection-debug/projected/verification-grid.png` (2D verification canvas grid: rows=glyphs, columns=slits/segments; includes projected shapes, display-frame bounding boxes, and row separators)
 
 ### Tape rectangle debug visuals
 
