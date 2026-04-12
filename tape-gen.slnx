@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="tape-gen/tape-gen.csproj" />
   <Project Path="tape-gen.Tests/tape-gen.Tests.csproj" />
+  <Project Path="tape-generation/tape-generation.csproj" />
 </Solution>

@@ -1,0 +1,46 @@
+{
+    "SlitWidthMm": 14,
+    "SlitHeightMm": 20,
+    "SlitCount": 4,
+    "SlitSegmentCenterDistanceMm": 60.0,
+    "TapeTopHeightFromGroundMm": 130,
+    "DisplayedSegmentWidthMm": 180.0,
+    "DisplayedSegmentHeightMm": 300.0,
+    "DisplayedSegmentCenterDistanceMm": 160.0,
+    "TapeOriginMm": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 130
+    },
+    "SlitDirection": {
+        "X": 1.0,
+        "Y": 0.0,
+        "Z": 0.0
+    },
+    "SlitNormal": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 1.0
+    },
+    "SlitUpDirection": {
+        "X": 0.0,
+        "Y": 1.0,
+        "Z": 0.0
+    },
+    "DisplayPlanePointMm": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 2000.0
+    },
+    "DisplayPlaneNormal": {
+        "X": 0.0,
+        "Y": 0.0,
+        "Z": 1.0
+    },
+    "DisplayPlaneUpDirection": {
+        "X": 0.0,
+        "Y": 1.0,
+        "Z": 0.0
+    },
+    "GlyphPixelSizeMm": 0.065
+}
