@@ -46,6 +46,99 @@ public sealed class TapeBitmapGeneratorTests
     }
 
     [Fact]
+    public void GenerateTapeBitmap_LogsProjectionGeometryOncePerSlit()
+    {
+        TapeSpec spec = BuildDebugHighlightSpec(slitWidthPx: 36, slitHeightPx: 30, slitCenterYOffsetPx: 50);
+        spec.SegmentCharacters = "1234";
+        spec.MainCharacters = "1234";
+        spec.SlitCount = 4;
+        spec.FontPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../tape-gen/digital-7.regular.ttf"));
+        spec.WorldGeometry = BuildWorldGeometry(slitCount: 4);
+
+        TextWriter originalOut = Console.Out;
+        using var capture = new StringWriter();
+        try
+        {
+            Console.SetOut(capture);
+            using SKBitmap _ = TapeBitmapGenerator.GenerateTapeBitmap(spec, slitIndex: 2);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        string output = capture.ToString();
+        Assert.Equal(1, CountSubstring(output, "[Slit 2]"));
+        Assert.Equal(1, CountSubstring(output, "Display center"));
+        Assert.Equal(1, CountSubstring(output, "Slit center"));
+        Assert.Equal(1, CountSubstring(output, "Light source"));
+    }
+
+    [Fact]
+    public void GenerateTapeBitmap_DisplayCenterDiffersAcrossSlits()
+    {
+        TapeSpec spec = BuildDebugHighlightSpec(slitWidthPx: 36, slitHeightPx: 30, slitCenterYOffsetPx: 50);
+        spec.SegmentCharacters = "1234";
+        spec.MainCharacters = "1234";
+        spec.SlitCount = 4;
+        spec.FontPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../tape-gen/digital-7.regular.ttf"));
+        spec.WorldGeometry = BuildWorldGeometry(slitCount: 4);
+
+        var displayCenters = new List<string>();
+        for (int slitIndex = 0; slitIndex < spec.SlitCount; slitIndex++)
+        {
+            TextWriter originalOut = Console.Out;
+            using var capture = new StringWriter();
+            try
+            {
+                Console.SetOut(capture);
+                using SKBitmap _ = TapeBitmapGenerator.GenerateTapeBitmap(spec, slitIndex);
+            }
+            finally
+            {
+                Console.SetOut(originalOut);
+            }
+
+            string output = capture.ToString();
+            string? centerLine = output.Split('\n').FirstOrDefault(l => l.Contains("Display center"));
+            Assert.NotNull(centerLine);
+            displayCenters.Add(centerLine!.Trim());
+        }
+
+        // Every slit must have a distinct display-center line
+        Assert.Equal(spec.SlitCount, displayCenters.Distinct(StringComparer.Ordinal).Count());
+    }
+
+    [Fact]
+    public void GenerateTapeBitmap_DisplayCenterZMatchesWorldGeometry()
+    {
+        TapeSpec spec = BuildDebugHighlightSpec(slitWidthPx: 36, slitHeightPx: 30, slitCenterYOffsetPx: 50);
+        spec.SegmentCharacters = "1";
+        spec.MainCharacters = "1";
+        spec.SlitCount = 1;
+        spec.FontPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../tape-gen/digital-7.regular.ttf"));
+        spec.WorldGeometry = BuildWorldGeometry(slitCount: 1);
+
+        TextWriter originalOut = Console.Out;
+        using var capture = new StringWriter();
+        try
+        {
+            Console.SetOut(capture);
+            using SKBitmap _ = TapeBitmapGenerator.GenerateTapeBitmap(spec, slitIndex: 0);
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
+
+        string output = capture.ToString();
+        string? centerLine = output.Split('\n').FirstOrDefault(l => l.Contains("Display center"));
+        Assert.NotNull(centerLine);
+        // Z coordinate must match the configured display plane Z (2000 mm)
+        Assert.Contains("2000.000", centerLine);
+    }
+
+    [Fact]
     public void CropToOpaqueBounds_IgnoresLowAlphaFringePixels()
     {
         using var bitmap = new SKBitmap(10, 10, SKColorType.Bgra8888, SKAlphaType.Premul);
@@ -90,6 +183,25 @@ public sealed class TapeBitmapGeneratorTests
         MainPaddingXPx = 8,
         MainPaddingYPx = 8,
         DebugHighlightRects = true
+    };
+
+    private static WorldGeometryConfig BuildWorldGeometry(int slitCount) => new()
+    {
+        SlitWidthMm = 14,
+        SlitHeightMm = 20,
+        SlitCount = slitCount,
+        SlitSegmentCenterDistanceMm = 60.0,
+        TapeTopHeightFromGroundMm = 130,
+        DisplayedSegmentWidthMm = 180.0,
+        DisplayedSegmentHeightMm = 300.0,
+        DisplayedSegmentCenterDistanceMm = 160.0,
+        TapeOriginMm = new Point3DMmConfig { XMm = 0, YMm = 0, ZMm = 0 },
+        SlitDirection = new Vector3DConfig { X = 1, Y = 0, Z = 0 },
+        SlitNormal = new Vector3DConfig { X = 0, Y = 0, Z = 1 },
+        SlitUpDirection = new Vector3DConfig { X = 0, Y = 1, Z = 0 },
+        DisplayPlanePointMm = new Point3DMmConfig { XMm = 0, YMm = 0, ZMm = 2000 },
+        DisplayPlaneNormal = new Vector3DConfig { X = 0, Y = 0, Z = 1 },
+        DisplayPlaneUpDirection = new Vector3DConfig { X = 0, Y = 1, Z = 0 }
     };
 
     private static SKRectI FindDeadzoneHighlightBounds(SKBitmap bitmap)
@@ -149,5 +261,18 @@ public sealed class TapeBitmapGeneratorTests
         }
 
         return new SKRectI(left, top, rightExclusive, bottomExclusive);
+    }
+
+    private static int CountSubstring(string source, string value)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }

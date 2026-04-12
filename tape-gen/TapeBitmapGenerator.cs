@@ -28,6 +28,7 @@ internal sealed class TapeSpec
     public string OutputPath { get; set; } = string.Empty;
     public bool DebugDrawRects { get; set; }
     public bool DebugHighlightRects { get; set; }
+    public WorldGeometryConfig WorldGeometry { get; set; } = new();
 }
 
 internal static class TapeBitmapGenerator
@@ -91,7 +92,7 @@ internal static class TapeBitmapGenerator
             SKRectI absoluteDeadzoneRect = ComputeDeadzoneApertureRect(segmentRect, spec);
             if (useFontFile)
             {
-                DrawProjectedDeadzoneGlyphUsingPipeline(bitmap, deadzoneChar, mainRect, absoluteDeadzoneRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount, i);
+                DrawProjectedDeadzoneGlyphUsingPipeline(bitmap, deadzoneChar, mainRect, absoluteDeadzoneRect, typeface, spec.ForegroundColor, slitIndex, spec.SlitCount, i, spec.WorldGeometry);
             }
             else
             {
@@ -328,7 +329,8 @@ internal static class TapeBitmapGenerator
         SKColor color,
         int slitIndex,
         int slitCount,
-        int segmentIndex)
+        int segmentIndex,
+        WorldGeometryConfig worldGeometry)
     {
         using SKBitmap sourceMask = RenderGlyphMask(glyph, sourceRect.Width, sourceRect.Height, typeface);
         List<SampledPixel> sampledPixels = SampleOpaquePixels(sourceMask, ProjectionSampleStep);
@@ -337,20 +339,26 @@ internal static class TapeBitmapGenerator
             return;
         }
 
-        double tiltRadians = ProjectionDisplayTiltDegrees * (Math.PI / 180.0);
-        var displayCenter = new Point3D(0, 0, ProjectionLightDistance);
-        var displayNormal = new Vector3D(0, -Math.Sin(tiltRadians), Math.Cos(tiltRadians));
-        var displayUp = new Vector3D(0, Math.Cos(tiltRadians), Math.Sin(tiltRadians));
-        Frame displayFrame = new(displayCenter, displayNormal, displayUp, sourceRect.Width, sourceRect.Height);
+        double middleIndex = (slitCount - 1) / 2.0;
+        Vector3D slitDirection = NormalizeVector3D(worldGeometry.SlitDirection);
+        Vector3D slitNormal = NormalizeVector3D(worldGeometry.SlitNormal);
+        Vector3D slitUp = NormalizeVector3D(worldGeometry.SlitUpDirection);
 
-        double slitPosition = slitCount == 1 ? 0.0 : ((double)slitIndex / (slitCount - 1)) - 0.5;
-        double slitOffsetX = deadzoneApertureRect.Width * ProjectionSlitSpreadXRatio * slitPosition;
-        Frame slitFrame = new(
-            new Point3D(slitOffsetX, 0, 0),
-            new Vector3D(0, 0, 1),
-            new Vector3D(0, 1, 0),
-            deadzoneApertureRect.Width,
-            deadzoneApertureRect.Height);
+        double slitOffset = (slitIndex - middleIndex) * worldGeometry.SlitSegmentCenterDistanceMm;
+        var slitCenter = new Point3D(
+            worldGeometry.TapeOriginMm.XMm + (slitDirection.X * slitOffset) + (slitNormal.X * worldGeometry.TapeTopHeightFromGroundMm),
+            worldGeometry.TapeOriginMm.YMm + (slitDirection.Y * slitOffset) + (slitNormal.Y * worldGeometry.TapeTopHeightFromGroundMm),
+            worldGeometry.TapeOriginMm.ZMm + (slitDirection.Z * slitOffset) + (slitNormal.Z * worldGeometry.TapeTopHeightFromGroundMm));
+        Frame slitFrame = new(slitCenter, slitNormal, slitUp, worldGeometry.SlitWidthMm, worldGeometry.SlitHeightMm);
+
+        Vector3D displayNormal = NormalizeVector3D(worldGeometry.DisplayPlaneNormal);
+        Vector3D displayUp = NormalizeVector3D(worldGeometry.DisplayPlaneUpDirection);
+        double displayOffset = (slitIndex - middleIndex) * worldGeometry.DisplayedSegmentCenterDistanceMm;
+        var displayCenter = new Point3D(
+            worldGeometry.DisplayPlanePointMm.XMm + (slitDirection.X * displayOffset),
+            worldGeometry.DisplayPlanePointMm.YMm + (slitDirection.Y * displayOffset),
+            worldGeometry.DisplayPlanePointMm.ZMm + (slitDirection.Z * displayOffset));
+        Frame displayFrame = new(displayCenter, displayNormal, displayUp, worldGeometry.DisplayedSegmentWidthMm, worldGeometry.DisplayedSegmentHeightMm);
 
         // Derive the light source as the convergence of rays from each display corner through the
         // corresponding slit corner. This guarantees that any pixel inside the display projects
@@ -367,10 +375,13 @@ internal static class TapeBitmapGenerator
             throw new InvalidOperationException("Cannot compute projection light source: display and slit corners do not converge.");
         }
 
-        Console.WriteLine($"[Segment {segmentIndex} '{glyph}' | Slit {slitIndex}]");
-        Console.WriteLine($"  Display center : ({displayFrame.Center.X:F3}, {displayFrame.Center.Y:F3}, {displayFrame.Center.Z:F3})");
-        Console.WriteLine($"  Slit center    : ({slitFrame.Center.X:F3}, {slitFrame.Center.Y:F3}, {slitFrame.Center.Z:F3})");
-        Console.WriteLine($"  Light source   : ({lightSource.X:F3}, {lightSource.Y:F3}, {lightSource.Z:F3})");
+        if (segmentIndex == 0)
+        {
+            Console.WriteLine($"[Slit {slitIndex}]");
+            Console.WriteLine($"  Display center : ({displayFrame.Center.X:F3}, {displayFrame.Center.Y:F3}, {displayFrame.Center.Z:F3})");
+            Console.WriteLine($"  Slit center    : ({slitFrame.Center.X:F3}, {slitFrame.Center.Y:F3}, {slitFrame.Center.Z:F3})");
+            Console.WriteLine($"  Light source   : ({lightSource.X:F3}, {lightSource.Y:F3}, {lightSource.Z:F3})");
+        }
 
         SlitProjectionResult projection = ProjectionPipeline.ProjectSingleSlit(
             slitIndex,
@@ -394,6 +405,17 @@ internal static class TapeBitmapGenerator
                 tapeBitmap.SetPixel(targetX, targetY, color);
             }
         }
+    }
+
+    private static Vector3D NormalizeVector3D(Vector3DConfig v)
+    {
+        double length = Math.Sqrt((v.X * v.X) + (v.Y * v.Y) + (v.Z * v.Z));
+        if (length <= 0d)
+        {
+            throw new InvalidOperationException("World geometry vector must not be zero.");
+        }
+
+        return new Vector3D(v.X / length, v.Y / length, v.Z / length);
     }
 
     private static SKBitmap RenderGlyphMask(char glyph, int width, int height, SKTypeface typeface)
