@@ -116,5 +116,24 @@ namespace Phys
 
             return new ProjectedPoint { PixelX = px, PixelY = py };
         }
+
+        /// <summary>
+        /// Returns the raw (U, V) coordinate multipliers of a 3D point on this frame.
+        /// TopLeft is (0,0), BottomRight is (1,1). Can return values outside 0-1 if the point is outside the frame.
+        /// </summary>
+        public (double U, double V) Map3DToUV(Point3D point3D)
+        {
+            Vector3D pointVector = new Vector3D(point3D.X - TopLeft.X, point3D.Y - TopLeft.Y, point3D.Z - TopLeft.Z);
+            Vector3D right = new Vector3D(TopRight.X - TopLeft.X, TopRight.Y - TopLeft.Y, TopRight.Z - TopLeft.Z);
+            Vector3D down = new Vector3D(BottomLeft.X - TopLeft.X, BottomLeft.Y - TopLeft.Y, BottomLeft.Z - TopLeft.Z);
+
+            double rightMagSq = (right.X * right.X) + (right.Y * right.Y) + (right.Z * right.Z);
+            double downMagSq = (down.X * down.X) + (down.Y * down.Y) + (down.Z * down.Z);
+
+            double u = rightMagSq > 0 ? ((pointVector.X * right.X) + (pointVector.Y * right.Y) + (pointVector.Z * right.Z)) / rightMagSq : 0;
+            double v = downMagSq > 0 ? ((pointVector.X * down.X) + (pointVector.Y * down.Y) + (pointVector.Z * down.Z)) / downMagSq : 0;
+
+            return (u, v);
+        }
     }
 }

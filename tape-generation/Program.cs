@@ -88,25 +88,47 @@ for (int charIndex = 0; charIndex < mainCharacterBitmaps.Count; charIndex++)
         Plane tapePlane = new Plane { Point = tapeFrame.Center, Normal = Config.WorldGeometry.SlitNormal };
         List<ProjectedPoint> slitSpecificDeadzonePixels = new List<ProjectedPoint>();
 
+        // We want the mask to be the EXACT size of the physical tape segment
+        int segmentWidthPx = MmToPx(Config.Tape.SegmentWidthMm);
+        int segmentHeightPx = MmToPx(Config.Tape.SegmentHeightMm);
+
+        // Calculate the physical mm position of the Slit's Top-Left corner on the Tape Segment
+        double slitTopLeftX_mm = (Config.Tape.SegmentWidthMm / 2.0) - (Config.WorldGeometry.SlitWidthMm / 2.0);
+        double slitTopLeftY_mm = Config.Tape.SlitCenterYOffsetMm - (Config.WorldGeometry.SlitHeightMm / 2.0);
+
         foreach (var pixel in deadSample.Pixels)
         {
             Point3D displayPoint3D = displayFrame.MapPixelTo3D(pixel.X, pixel.Y, deadSample.BitmapWidth, deadSample.BitmapHeight);
 
             if (GeometryMath.GetProjectionPoint(lightSourcePos.Value, displayPoint3D, tapePlane, out Point3D tapePoint3D))
             {
-                ProjectedPoint tapePixel = tapeFrame.Map3DToPixel(tapePoint3D, deadSample.BitmapWidth, deadSample.BitmapHeight);
+                // 1. Get raw float position on the Slit Frame
+                var uv = tapeFrame.Map3DToUV(tapePoint3D);
 
-                if (tapePixel.PixelX >= 0 && tapePixel.PixelX < deadSample.BitmapWidth &&
-                    tapePixel.PixelY >= 0 && tapePixel.PixelY < deadSample.BitmapHeight)
+                // 2. Convert to mm relative to the Slit's Top-Left corner
+                double hitX_fromSlitLeft_mm = uv.U * Config.WorldGeometry.SlitWidthMm;
+                double hitY_fromSlitTop_mm = uv.V * Config.WorldGeometry.SlitHeightMm;
+
+                // 3. Translate to Absolute MM on the full Tape Segment
+                double absoluteX_mm = slitTopLeftX_mm + hitX_fromSlitLeft_mm;
+                double absoluteY_mm = slitTopLeftY_mm + hitY_fromSlitTop_mm;
+
+                // 4. Convert Absolute MM into final pixel coordinates
+                int pxX = MmToPx(absoluteX_mm);
+                int pxY = MmToPx(absoluteY_mm);
+
+                // Add it if it hits the tape backing!
+                if (pxX >= 0 && pxX < segmentWidthPx && pxY >= 0 && pxY < segmentHeightPx)
                 {
-                    slitSpecificDeadzonePixels.Add(tapePixel);
+                    slitSpecificDeadzonePixels.Add(new ProjectedPoint { PixelX = pxX, PixelY = pxY });
                 }
             }
         }
 
+        // Build the mask using the FULL segment dimensions
         bool[][] renderedDeadProjectionBaseBitmap = ProjectionUtils.BuildSourceBitmap(
-            deadSample.BitmapWidth,
-            deadSample.BitmapHeight,
+            segmentWidthPx,
+            segmentHeightPx,
             slitSpecificDeadzonePixels
         );
 
@@ -378,34 +400,22 @@ void GeneratePhysicalTapes(
             if (debug) canvas.DrawRect(mainX, mainY, mainW, mainH, debugMainPaint);
 
 
+
             // --- 2. SAFELY PLACE DEADZONE GLYPH ---
             bool[][] deadMask = new bool[0][];
+            if (c < deadzoneMasks.Count && s < deadzoneMasks[c].Count) deadMask = deadzoneMasks[c][s];
 
-            // Check if both the Character Index (c) and Slit Index (s) exist in the list
-            if (c < deadzoneMasks.Count && s < deadzoneMasks[c].Count)
-            {
-                deadMask = deadzoneMasks[c][s];
-            }
-            else
-            {
-                // If missing, leave it blank and log a warning
-                Console.WriteLine($"[WARNING] Missing deadzone mask for Character {c}, Slit {s}. Skipping drawing.");
-            }
-
-            int deadH = deadMask.Length;
-            int deadW = deadH > 0 ? deadMask[0].Length : 0;
-
-            int slitCenterAbsoluteY = segmentYStart + MmToPx(Config.Tape.SlitCenterYOffsetMm);
-            int deadX = (tapeWidthPx - deadW) / 2;
-            int deadY = slitCenterAbsoluteY - (deadH / 2);
-
-            DrawMaskToCanvas(canvas, deadMask, deadX, deadY);
+            // The deadMask is already perfectly aligned to the 50x100mm segment bounds!
+            // No centering required. Just draw it directly at the segment's starting Y.
+            DrawMaskToCanvas(canvas, deadMask, 0, segmentYStart);
 
             if (debug)
             {
-                canvas.DrawRect(deadX, deadY, deadW, deadH, debugDeadPaint);
+                // Draw a horizontal line showing exactly where the physical slit center is
+                int slitCenterAbsoluteY = segmentYStart + MmToPx(Config.Tape.SlitCenterYOffsetMm);
                 canvas.DrawLine(0, slitCenterAbsoluteY, tapeWidthPx, slitCenterAbsoluteY, debugDeadPaint);
             }
+
         }
 
         string debugSuffix = debug ? "-debug" : "";
