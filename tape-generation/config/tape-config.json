@@ -1,6 +1,6 @@
 {
-    "DeadzoneCharacters": "123",
-    "MainCharacters": "123",
+    "DeadzoneCharacters": "0123456789",
+    "MainCharacters": "0123456789",
     "Offset": 1,
     "Dpi": 200,
     "MainGlyphFontSizeMm": 90,
@@ -10,5 +10,5 @@
     "TopMarginMm": 5,
     "MainHorizontalPaddingMm": 2,
     "MainVerticalPaddingMm": 0.0,
-    "SlitCenterYOffsetMm": 26.5
+    "SlitCenterYOffsetMm": 25
 }

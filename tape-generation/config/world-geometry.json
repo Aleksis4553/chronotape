@@ -6,7 +6,7 @@
     "TapeTopHeightFromGroundMm": 130,
     "DisplayedSegmentWidthMm": 140.0,
     "DisplayedSegmentHeightMm": 200.0,
-    "DisplayedSegmentCenterDistanceMm": 70.0,
+    "DisplayedSegmentCenterDistanceMm": 140.0,
     "TapeOriginMm": {
         "X": 0.0,
         "Y": 0.0,
@@ -41,6 +41,5 @@
         "X": 0.0,
         "Y": 1.0,
         "Z": 0.0
-    },
-    "GlyphPixelSizeMm": 0.065
+    }
 }

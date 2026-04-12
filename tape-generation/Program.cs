@@ -50,9 +50,17 @@ string projectedDir = Path.Combine(Config.Paths.Render, "projected");
 Directory.CreateDirectory(renderedDir);
 Directory.CreateDirectory(projectedDir);
 
-List<CharacterBitmapSample> deadzoneCharacterBitmaps = TextSampler.RenderAndSampleCharacters(Config.Paths.DeadzoneFont, Config.Tape.DeadzoneCharacters, MmToPx(Config.Tape.DeadGlyphFontSizeMm), 1);
+List<CharacterBitmapSample> deadzoneBaseCharacterBitmaps = TextSampler.RenderAndSampleCharacters(Config.Paths.DeadzoneFont, Config.Tape.DeadzoneCharacters, MmToPx(Config.Tape.DeadGlyphFontSizeMm), 1);
 List<CharacterBitmapSample> mainCharacterBitmaps = TextSampler.RenderAndSampleCharacters(Config.Paths.DeadzoneFont, Config.Tape.DeadzoneCharacters, MmToPx(Config.Tape.MainGlyphFontSizeMm), 1);
 
+// Flip vertical coordinates for bottom-viewing immediately after sampling
+foreach (var sample in deadzoneBaseCharacterBitmaps)
+{
+    foreach (var pixel in sample.Pixels)
+    {
+        pixel.Y = (sample.BitmapHeight - 1) - pixel.Y;
+    }
+}
 // Store the generated masks: Rows = Characters, Columns = Slits
 List<List<bool[][]>> allGeneratedTapeMasks = new List<List<bool[][]>>();
 List<bool[][]> allMainMasks = new List<bool[][]>();
@@ -69,7 +77,7 @@ for (int charIndex = 0; charIndex < mainCharacterBitmaps.Count; charIndex++)
     );
     SaveBoolBitmap(renderedMainBitmap, Path.Combine(renderedDir, $"main-{charIndex:D2}-{mainSample.Character}.png"));
 
-    CharacterBitmapSample deadSample = deadzoneCharacterBitmaps[charIndex];
+    CharacterBitmapSample deadSample = deadzoneBaseCharacterBitmaps[charIndex];
 
     List<bool[][]> characterSlitMasks = new List<bool[][]>();
 
@@ -143,9 +151,9 @@ for (int charIndex = 0; charIndex < mainCharacterBitmaps.Count; charIndex++)
 }
 
 GeneratePhysicalTapes(allMainMasks, allGeneratedTapeMasks, slits.Count, Config.Paths.TapeOutput,
-debug: true);
+debug: false);
 
-GenerateVerificationGrid(allGeneratedTapeMasks, deadzoneCharacterBitmaps, slits, displayedSegments, lightSources, Path.Combine(projectedDir, "verification-grid.png"));
+GenerateVerificationGrid(allGeneratedTapeMasks, deadzoneBaseCharacterBitmaps, slits, displayedSegments, lightSources, Path.Combine(projectedDir, "verification-grid.png"));
 
 // ============ HELPERS ============
 Point3D?[] ComputeLightSources(List<Frame> slits, List<Frame> displayedSegments)
@@ -227,21 +235,43 @@ void GenerateVerificationGrid(
 {
     if (allGeneratedTapeMasks.Count == 0 || slits.Count == 0) return;
 
-    // Use the original dimensions for the output display grid
-    int displayW = deadzoneCharacterBitmaps[0].BitmapWidth;
-    int displayH = deadzoneCharacterBitmaps[0].BitmapHeight;
+    // Helper functions for scaling
+    int MmToPx(double mm) => (int)Math.Round(mm * Config.Tape.Dpi / 25.4);
+    double PxToMm(int px) => (px * 25.4) / Config.Tape.Dpi;
+
+    // --- NEW: Calculate the GLOBAL Master Display Frame ---
+    // This represents the entire physical surface where all segments overlap.
+    double totalDisplayWidthMm = (slits.Count - 1) * Config.WorldGeometry.DisplayedSegmentCenterDistanceMm + Config.WorldGeometry.DisplayedSegmentWidthMm;
+    double totalDisplayHeightMm = Config.WorldGeometry.DisplayedSegmentHeightMm;
+
+    Frame masterDisplayFrame = new Frame(
+        Config.WorldGeometry.DisplayPlanePointMm,
+        Config.WorldGeometry.DisplayPlaneNormal,
+        Config.WorldGeometry.DisplayPlaneUpDirection,
+        totalDisplayWidthMm,
+        totalDisplayHeightMm
+    );
+
+    int masterDisplayPxW = MmToPx(totalDisplayWidthMm);
+    int masterDisplayPxH = MmToPx(totalDisplayHeightMm);
 
     int cols = slits.Count + 1;
     int rows = allGeneratedTapeMasks.Count;
 
-    using SKBitmap gridBitmap = new SKBitmap(cols * displayW, rows * displayH, SKColorType.Bgra8888, SKAlphaType.Premul);
+    using SKBitmap gridBitmap = new SKBitmap(cols * masterDisplayPxW, rows * masterDisplayPxH, SKColorType.Bgra8888, SKAlphaType.Premul);
     using SKCanvas canvas = new SKCanvas(gridBitmap);
     canvas.Clear(SKColors.Black);
 
     using SKPaint pixelPaint = new SKPaint { Color = SKColors.White, IsAntialias = false };
-    using SKPaint bboxPaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
+    using SKPaint bboxPaint = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
 
     SKColor[] boxColors = new SKColor[] { SKColors.Red, SKColors.Green, SKColors.Blue, SKColors.Yellow, SKColors.Cyan, SKColors.Magenta };
+
+    // Physical offsets on the tape segment
+    double slitTopLeftX_mm = (Config.Tape.SegmentWidthMm / 2.0) - (Config.WorldGeometry.SlitWidthMm / 2.0);
+    double slitTopLeftY_mm = Config.Tape.SlitCenterYOffsetMm - (Config.WorldGeometry.SlitHeightMm / 2.0);
+
+    Plane displayPlane = new Plane { Point = masterDisplayFrame.Center, Normal = Config.WorldGeometry.DisplayPlaneNormal };
 
     for (int c = 0; c < rows; c++)
     {
@@ -251,7 +281,6 @@ void GenerateVerificationGrid(
 
         for (int s = 0; s < slits.Count; s++)
         {
-            Frame displayFrame = displayedSegments[s];
             Frame tapeFrame = slits[s];
             Point3D? lightSourcePos = lightSources[s];
             bool[][] tapeMask = tapeMasksForChar[s];
@@ -261,47 +290,65 @@ void GenerateVerificationGrid(
             int tapeH = tapeMask.Length;
             int tapeW = tapeMask[0].Length;
 
-            Plane displayPlane = new Plane { Point = displayFrame.Center, Normal = Config.WorldGeometry.DisplayPlaneNormal };
-
             List<ProjectedPoint> reverseProjectedPixels = new List<ProjectedPoint>();
             int minX = int.MaxValue, minY = int.MaxValue, maxX = int.MinValue, maxY = int.MinValue;
 
-            // Iterate over the ACTUAL generated tape mask
             for (int tapeY = 0; tapeY < tapeH; tapeY++)
             {
                 for (int tapeX = 0; tapeX < tapeW; tapeX++)
                 {
-                    if (tapeMask[tapeY][tapeX]) // If there is a hole in the tape here
+                    if (tapeMask[tapeY][tapeX])
                     {
-                        // 1. Map this discrete tape pixel to a 3D point on the tape frame
-                        Point3D tapePoint3D = tapeFrame.MapPixelTo3D(tapeX, tapeY, tapeW, tapeH);
+                        // 1. Convert Tape Segment Pixel back to Physical Tape MM
+                        double absoluteX_mm = PxToMm(tapeX);
+                        double absoluteY_mm = PxToMm(tapeY);
 
-                        // 2. Cast ray from Light Source, THROUGH this tape hole, to the Display Plane
+                        // 2. Find position relative to the physical Slit top-left
+                        double hitX_fromSlitLeft_mm = absoluteX_mm - slitTopLeftX_mm;
+                        double hitY_fromSlitTop_mm = absoluteY_mm - slitTopLeftY_mm;
+
+                        // 3. Convert to UV (percentage across the physical slit)
+                        double u = hitX_fromSlitLeft_mm / Config.WorldGeometry.SlitWidthMm;
+                        double v = hitY_fromSlitTop_mm / Config.WorldGeometry.SlitHeightMm;
+
+                        // 4. Map UV to the 3D Point on the specific Slit Frame
+                        Vector3D topEdge = new Vector3D(tapeFrame.TopRight.X - tapeFrame.TopLeft.X, tapeFrame.TopRight.Y - tapeFrame.TopLeft.Y, tapeFrame.TopRight.Z - tapeFrame.TopLeft.Z);
+                        Vector3D bottomEdge = new Vector3D(tapeFrame.BottomRight.X - tapeFrame.BottomLeft.X, tapeFrame.BottomRight.Y - tapeFrame.BottomLeft.Y, tapeFrame.BottomRight.Z - tapeFrame.BottomLeft.Z);
+
+                        Point3D topPoint = new Point3D(tapeFrame.TopLeft.X + topEdge.X * u, tapeFrame.TopLeft.Y + topEdge.Y * u, tapeFrame.TopLeft.Z + topEdge.Z * u);
+                        Point3D bottomPoint = new Point3D(tapeFrame.BottomLeft.X + bottomEdge.X * u, tapeFrame.BottomLeft.Y + bottomEdge.Y * u, tapeFrame.BottomLeft.Z + bottomEdge.Z * u);
+
+                        Vector3D verticalEdge = new Vector3D(bottomPoint.X - topPoint.X, bottomPoint.Y - topPoint.Y, bottomPoint.Z - topPoint.Z);
+                        Point3D tapePoint3D = new Point3D(topPoint.X + verticalEdge.X * v, topPoint.Y + verticalEdge.Y * v, topPoint.Z + verticalEdge.Z * v);
+
+                        // 5. Cast ray from Light Source, THROUGH this slit point, to the Display Plane
                         if (GeometryMath.GetProjectionPoint(lightSourcePos.Value, tapePoint3D, displayPlane, out Point3D revDisplayPoint3D))
                         {
-                            // 3. Map the intersection back to a Display Pixel
-                            ProjectedPoint revDisplayPixel = displayFrame.Map3DToPixel(revDisplayPoint3D, displayW, displayH);
+                            // 6. Map the intersection onto the GLOBAL Master Display Frame instead of the local segment!
+                            ProjectedPoint revDisplayPixel = masterDisplayFrame.Map3DToPixel(revDisplayPoint3D, masterDisplayPxW, masterDisplayPxH);
 
-                            reverseProjectedPixels.Add(revDisplayPixel);
-                            combinedPixels.Add(revDisplayPixel);
+                            // Optional bounds check to ensure the ray landed on the glass at all
+                            if (revDisplayPixel.PixelX >= 0 && revDisplayPixel.PixelX < masterDisplayPxW &&
+                                revDisplayPixel.PixelY >= 0 && revDisplayPixel.PixelY < masterDisplayPxH)
+                            {
+                                reverseProjectedPixels.Add(revDisplayPixel);
+                                combinedPixels.Add(revDisplayPixel);
 
-                            if (revDisplayPixel.PixelX < minX) minX = revDisplayPixel.PixelX;
-                            if (revDisplayPixel.PixelX > maxX) maxX = revDisplayPixel.PixelX;
-                            if (revDisplayPixel.PixelY < minY) minY = revDisplayPixel.PixelY;
-                            if (revDisplayPixel.PixelY > maxY) maxY = revDisplayPixel.PixelY;
+                                if (revDisplayPixel.PixelX < minX) minX = revDisplayPixel.PixelX;
+                                if (revDisplayPixel.PixelX > maxX) maxX = revDisplayPixel.PixelX;
+                                if (revDisplayPixel.PixelY < minY) minY = revDisplayPixel.PixelY;
+                                if (revDisplayPixel.PixelY > maxY) maxY = revDisplayPixel.PixelY;
+                            }
                         }
                     }
                 }
             }
 
-            // --- DRAW INDIVIDUAL SLIT TO GRID ---
-            int cellOffsetX = s * displayW;
-            int cellOffsetY = c * displayH;
+            // --- DRAW TO MASTER GRID CELL ---
+            int cellOffsetX = s * masterDisplayPxW;
+            int cellOffsetY = c * masterDisplayPxH;
 
-            foreach (var rp in reverseProjectedPixels)
-            {
-                canvas.DrawPoint(cellOffsetX + rp.PixelX, cellOffsetY + rp.PixelY, pixelPaint);
-            }
+            foreach (var rp in reverseProjectedPixels) canvas.DrawPoint(cellOffsetX + rp.PixelX, cellOffsetY + rp.PixelY, pixelPaint);
 
             if (minX <= maxX && minY <= maxY)
             {
@@ -312,14 +359,11 @@ void GenerateVerificationGrid(
             }
         }
 
-        // --- DRAW COMBINED VIEW (Last Column) ---
-        int combinedOffsetX = slits.Count * displayW;
-        int combinedOffsetY = c * displayH;
+        // --- DRAW COMBINED VIEW ---
+        int combinedOffsetX = slits.Count * masterDisplayPxW;
+        int combinedOffsetY = c * masterDisplayPxH;
 
-        foreach (var cp in combinedPixels)
-        {
-            canvas.DrawPoint(combinedOffsetX + cp.PixelX, combinedOffsetY + cp.PixelY, pixelPaint);
-        }
+        foreach (var cp in combinedPixels) canvas.DrawPoint(combinedOffsetX + cp.PixelX, combinedOffsetY + cp.PixelY, pixelPaint);
 
         for (int s = 0; s < combinedBBoxes.Count; s++)
         {
@@ -403,7 +447,7 @@ void GeneratePhysicalTapes(
 
             // --- 2. SAFELY PLACE DEADZONE GLYPH ---
             bool[][] deadMask = new bool[0][];
-            if (c < deadzoneMasks.Count && s < deadzoneMasks[c].Count) deadMask = deadzoneMasks[c][s];
+            if (c < deadzoneMasks.Count && s < deadzoneMasks[c].Count) deadMask = deadzoneMasks[(c + 1) % mainMasks.Count][s];
 
             // The deadMask is already perfectly aligned to the 50x100mm segment bounds!
             // No centering required. Just draw it directly at the segment's starting Y.
